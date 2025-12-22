@@ -16,7 +16,7 @@ local FakeScript = {
 }
 
 local script = FakeScript 
-local newController = (function()
+
     local Knit_upvr = require(game.ReplicatedStorage.Packages.Knit)
     local TradingFrame_upvr = script.TradingFrame
     local AmountSelector_upvr = script.AmountSelector
@@ -74,7 +74,7 @@ local newController = (function()
     local tbl_upvr = {}
     local tbl_upvr_2 = {}
     local any_CreateController_result1 = Knit_upvr.CreateController({
-        Name = "TradeController";
+        Name = "MyCustomTradeController";
     })
     local Color3_fromRGB_result1_upvr_3 = Color3.fromRGB(72, 29, 29)
     local Color3_fromRGB_result1_upvr_2 = Color3.fromRGB(30, 70, 35)
@@ -1694,18 +1694,13 @@ local newController = (function()
         end
         tbl_upvw = HelpfulFunctions_upvr.ShallowCopy(tbl_4_upvr)
     end
-    return any_CreateController_result1
-end)()
-if newController and newController.KnitStart then
-    -- ปิด Controller ตัวเก่าของเกมก่อน (ถ้าทำได้) เพื่อไม่ให้ตีกัน
-    pcall(function()
-        local Knit = require(game.ReplicatedStorage.Packages.Knit)
-        local Old = Knit.GetController("TradeController")
-        -- ตรงนี้อาจจะปิดยากหน่อยในบางเกม แต่ลองรันตัวใหม่ทับไปเลย
-    end)
 
-    newController:KnitStart()
-    print("TradeController ตัวใหม่ติดตั้งสำเร็จแล้ว!")
+local success, err = pcall(function()
+    any_CreateController_result1:KnitStart()
+end)
+
+if success then
+    print("✅ TradeController ตัวใหม่ติดตั้งสำเร็จแล้ว!")
 else
-    warn("ติดตั้งไม่สำเร็จ: หา Controller ไม่เจอ")
+    warn("❌ รัน KnitStart ไม่สำเร็จ: " .. tostring(err))
 end
