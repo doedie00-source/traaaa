@@ -1,0 +1,1711 @@
+local OldController = game:GetService("Players").LocalPlayer.PlayerScripts:WaitForChild("Controllers"):WaitForChild("TradeController")
+
+local FakeScript = {
+    TradingFrame = OldController:WaitForChild("TradingFrame"),
+    AmountSelector = OldController:WaitForChild("AmountSelector"),
+    PlayerList = OldController:WaitForChild("PlayerList"),
+    AreYouSure = OldController:WaitForChild("AreYouSure"),
+    TradeCompleted = OldController:WaitForChild("TradeCompleted"),
+    CancelTrade = OldController:WaitForChild("CancelTrade"),
+    TradeNoticication = OldController:WaitForChild("TradeNoticication"),
+    PlayerTemplate = OldController:WaitForChild("PlayerTemplate"),
+    Tradeables = OldController:WaitForChild("Tradeables"),
+    Chat = OldController:WaitForChild("Chat"),
+    TradeFailed = OldController:WaitForChild("TradeFailed"),
+    TradeFailedFull = OldController:WaitForChild("TradeFailedFull")
+}
+
+local script = FakeScript 
+local newController = (function()
+    local Knit_upvr = require(game.ReplicatedStorage.Packages.Knit)
+    local TradingFrame_upvr = script.TradingFrame
+    local AmountSelector_upvr = script.AmountSelector
+    local PlayerList_upvr = script.PlayerList
+    local AreYouSure_upvr = script.AreYouSure
+    local TradeCompleted_upvr = script.TradeCompleted
+    local CancelTrade_upvr = script.CancelTrade
+    local var8_upvw
+    local var9_upvw
+    local var10_upvw
+    local var11_upvw
+    local var12_upvw
+    local var13_upvw
+    local var14_upvw
+    local var15_upvw
+    local var16_upvw = "ACCEPT"
+    local var17_upvw = false
+    local var18_upvw = false
+    local var19_upvw = false
+    local var20_upvw = false
+    local var21_upvw
+    local var22_upvw = true
+    local tick_result1_upvw = tick()
+    local workspace_GetServerTimeNow_result1_upvw = workspace:GetServerTimeNow()
+    local PolicyService_upvr = game:GetService("PolicyService")
+    local pcall_result1, pcall_result2 = pcall(function() -- Line 55
+        --[[ Upvalues[1]:
+            [1]: PolicyService_upvr (readonly)
+        ]]
+        return PolicyService_upvr:GetPolicyInfoForPlayerAsync(game.Players.LocalPlayer)
+    end)
+    local var29_upvw = false
+    if not pcall_result1 then
+        warn("PolicyService error: "..pcall_result2)
+    elseif pcall_result2.IsPaidItemTradingAllowed then
+        var29_upvw = true
+    end
+    local tbl_4_upvr = {
+        Currencies = {};
+        AccessoryService = {};
+        CratesService = {};
+        ItemsService = {};
+        PetsService = {};
+        MonsterService = {};
+    }
+    local tbl_upvr_3 = {
+        Luck = 100;
+        MaxHealth = 100;
+        Damage = 100;
+        Exp = 100;
+        Event = 100;
+        Speed = 250;
+    }
+    local tbl_upvw = {}
+    local tbl_upvr = {}
+    local tbl_upvr_2 = {}
+    local any_CreateController_result1 = Knit_upvr.CreateController({
+        Name = "TradeController";
+    })
+    local Color3_fromRGB_result1_upvr_3 = Color3.fromRGB(72, 29, 29)
+    local Color3_fromRGB_result1_upvr_2 = Color3.fromRGB(30, 70, 35)
+    local function _() -- Line 116, Named "SetAcceptDebounce"
+        --[[ Upvalues[2]:
+            [1]: tick_result1_upvw (read and write)
+            [2]: TradingFrame_upvr (readonly)
+        ]]
+        tick_result1_upvw = tick()
+        TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+    end
+    function any_CreateController_result1.SwitchMenu(arg1, arg2) -- Line 124
+        --[[ Upvalues[1]:
+            [1]: TradingFrame_upvr (readonly)
+        ]]
+        for _, v in TradingFrame_upvr.Inventory.Menus.Windows:GetChildren() do
+            if v.Name == arg2 then
+                v.Visible = true
+            else
+                v.Visible = false
+            end
+        end
+    end
+    function any_CreateController_result1.HandleMenuSwitching(arg1) -- Line 134
+        --[[ Upvalues[2]:
+            [1]: TradingFrame_upvr (readonly)
+            [2]: var8_upvw (read and write)
+        ]]
+        local Buttons = TradingFrame_upvr.Buttons
+        var8_upvw:WaitForInstance(Buttons.Items):andThen(function(arg1_2) -- Line 137
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1_2:AddCallback(function() -- Line 138
+                --[[ Upvalues[1]:
+                    [1]: arg1 (copied, readonly)
+                ]]
+                arg1:SwitchMenu("ItemsWindow")
+            end)
+        end)
+        var8_upvw:WaitForInstance(Buttons.Pets):andThen(function(arg1_3) -- Line 143
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1_3:AddCallback(function() -- Line 144
+                --[[ Upvalues[1]:
+                    [1]: arg1 (copied, readonly)
+                ]]
+                arg1:SwitchMenu("PetsWindow")
+            end)
+        end)
+        var8_upvw:WaitForInstance(Buttons.Accessories):andThen(function(arg1_4) -- Line 149
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1_4:AddCallback(function() -- Line 150
+                --[[ Upvalues[1]:
+                    [1]: arg1 (copied, readonly)
+                ]]
+                arg1:SwitchMenu("RelicsWindow")
+            end)
+        end)
+        var8_upvw:WaitForInstance(Buttons.Secrets):andThen(function(arg1_5) -- Line 155
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1_5:AddCallback(function() -- Line 156
+                --[[ Upvalues[1]:
+                    [1]: arg1 (copied, readonly)
+                ]]
+                arg1:SwitchMenu("SecretsWindow")
+            end)
+        end)
+    end
+    function any_CreateController_result1.AddToTradeData(arg1, arg2, arg3) -- Line 162
+        --[[ Upvalues[4]:
+            [1]: tbl_upvw (read and write)
+            [2]: tbl_upvr_3 (readonly)
+            [3]: var11_upvw (read and write)
+            [4]: var15_upvw (read and write)
+        ]]
+        -- KONSTANTERROR: [0] 1. Error Block 61 start (CF ANALYSIS FAILED)
+        local Service = arg2:GetAttribute("Service")
+        local Index = arg2:GetAttribute("Index")
+        local Guid = arg2:GetAttribute("Guid")
+        local var59
+        if not var59 then
+            var59 = arg2:GetAttribute("Quantity")
+        end
+        local Tier = arg2:GetAttribute("Tier")
+        if not Guid and Service ~= "MonsterService" then
+            if not tbl_upvw[Service][Index] then
+                tbl_upvw[Service][Index] = {}
+            end
+            if Tier then
+                tbl_upvw[Service][Index][Tier] = var59
+            else
+                tbl_upvw[Service][Index] = var59
+            end
+            -- KONSTANTWARNING: GOTO [165] #129
+        end
+        -- KONSTANTERROR: [0] 1. Error Block 61 end (CF ANALYSIS FAILED)
+        -- KONSTANTERROR: [44] 38. Error Block 57 start (CF ANALYSIS FAILED)
+        if not tbl_upvw[Service][Guid] and Service ~= "MonsterService" then
+            tbl_upvw[Service][Guid] = {}
+        end
+        if not Guid then
+            if Service == "MonsterService" then
+                if not tbl_upvw[Service].MonstersUnlocked then
+                    tbl_upvw[Service].MonstersUnlocked = {}
+                end
+                table.insert(tbl_upvw[Service].MonstersUnlocked, {
+                    Name = Index;
+                })
+                -- KONSTANTWARNING: GOTO [110] #87
+            end
+            -- KONSTANTWARNING: GOTO [110] #87
+        end
+        -- KONSTANTERROR: [44] 38. Error Block 57 end (CF ANALYSIS FAILED)
+    end
+    function any_CreateController_result1.RemoveFromTradeData(arg1, arg2) -- Line 253
+        --[[ Upvalues[3]:
+            [1]: var15_upvw (read and write)
+            [2]: tbl_upvw (read and write)
+            [3]: var11_upvw (read and write)
+        ]]
+        -- KONSTANTERROR: [0] 1. Error Block 1 start (CF ANALYSIS FAILED)
+        -- KONSTANTERROR: [0] 1. Error Block 1 end (CF ANALYSIS FAILED)
+        -- KONSTANTERROR: [2] 3. Error Block 2 start (CF ANALYSIS FAILED)
+        do
+            return
+        end
+        -- KONSTANTERROR: [2] 3. Error Block 2 end (CF ANALYSIS FAILED)
+        -- KONSTANTERROR: [3] 4. Error Block 3 start (CF ANALYSIS FAILED)
+        -- KONSTANTERROR: [3] 4. Error Block 3 end (CF ANALYSIS FAILED)
+    end
+    local Abbreviate_upvr = require(game.ReplicatedStorage.Shared.Abbreviate)
+    function any_CreateController_result1.HandleAmountSelector(arg1) -- Line 288
+        --[[ Upvalues[8]:
+            [1]: AmountSelector_upvr (readonly)
+            [2]: var13_upvw (read and write)
+            [3]: Abbreviate_upvr (readonly)
+            [4]: var8_upvw (read and write)
+            [5]: var9_upvw (read and write)
+            [6]: var10_upvw (read and write)
+            [7]: tick_result1_upvw (read and write)
+            [8]: TradingFrame_upvr (readonly)
+        ]]
+        local TextBox_upvr = AmountSelector_upvr.TextBoxBackground.TextBox
+        TextBox_upvr.Changed:Connect(function() -- Line 291
+            --[[ Upvalues[4]:
+                [1]: TextBox_upvr (readonly)
+                [2]: var13_upvw (copied, read and write)
+                [3]: AmountSelector_upvr (copied, readonly)
+                [4]: Abbreviate_upvr (copied, readonly)
+            ]]
+            local tonumber_result1_2 = tonumber(TextBox_upvr.Text)
+            if not tonumber_result1_2 then
+            else
+                if not var13_upvw then return end
+                if var13_upvw:GetAttribute("Quantity") < tonumber_result1_2 then
+                    TextBox_upvr.Text = var13_upvw:GetAttribute("Quantity")
+                end
+                if tonumber_result1_2 <= 0 then
+                    TextBox_upvr.Text = 1
+                end
+                if tonumber(TextBox_upvr.Text) then
+                    TextBox_upvr.Text = math.floor(tonumber(TextBox_upvr.Text))
+                    AmountSelector_upvr.Item.ButtonDisplay.Quantity.Text = 'x'..Abbreviate_upvr.Abbreviate(tonumber(TextBox_upvr.Text))
+                end
+            end
+        end)
+        var8_upvw:WaitForInstance(AmountSelector_upvr.Exit):andThen(function(arg1_6) -- Line 311
+            --[[ Upvalues[2]:
+                [1]: var13_upvw (copied, read and write)
+                [2]: var9_upvw (copied, read and write)
+            ]]
+            arg1_6:AddCallback(function() -- Line 312
+                --[[ Upvalues[2]:
+                    [1]: var13_upvw (copied, read and write)
+                    [2]: var9_upvw (copied, read and write)
+                ]]
+                var13_upvw = nil
+                var9_upvw:SetCurrentWindow("TradingFrame")
+            end)
+        end)
+        var8_upvw:WaitForInstance(AmountSelector_upvr.Buttons.AcceptButton):andThen(function(arg1_7) -- Line 318
+            --[[ Upvalues[7]:
+                [1]: TextBox_upvr (readonly)
+                [2]: var10_upvw (copied, read and write)
+                [3]: var13_upvw (copied, read and write)
+                [4]: arg1 (readonly)
+                [5]: var9_upvw (copied, read and write)
+                [6]: tick_result1_upvw (copied, read and write)
+                [7]: TradingFrame_upvr (copied, readonly)
+            ]]
+            arg1_7:AddCallback(function() -- Line 319
+                --[[ Upvalues[7]:
+                    [1]: TextBox_upvr (copied, readonly)
+                    [2]: var10_upvw (copied, read and write)
+                    [3]: var13_upvw (copied, read and write)
+                    [4]: arg1 (copied, readonly)
+                    [5]: var9_upvw (copied, read and write)
+                    [6]: tick_result1_upvw (copied, read and write)
+                    [7]: TradingFrame_upvr (copied, readonly)
+                ]]
+                local tonumber_result1 = tonumber(TextBox_upvr.Text)
+                if tonumber_result1 == nil or tonumber_result1 < 1 then
+                    var10_upvw:New("Invalid number!", "Red")
+                else
+                    if var13_upvw:GetAttribute("Quantity") < tonumber_result1 then
+                        var10_upvw:New("You don't have enough of that!", "Red")
+                        return
+                    end
+                    var10_upvw:New("Set selection to "..tonumber_result1..'!', "Green")
+                    var13_upvw:SetAttribute("Selected", true)
+                    arg1:AddToTradeData(var13_upvw, tonumber_result1)
+                    var13_upvw = nil
+                    var9_upvw:SetCurrentWindow("TradingFrame")
+                    tick_result1_upvw = tick()
+                    TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                end
+            end)
+        end)
+    end
+    function any_CreateController_result1.UpdateTradeOfferPreview(arg1, arg2, arg3) -- Line 351
+        --[[ Upvalues[2]:
+            [1]: tbl_upvr (readonly)
+            [2]: TradingFrame_upvr (readonly)
+        ]]
+        for i_2, _ in arg2 do
+            for _, v_3 in tbl_upvr do
+                if v_3.TargetService == i_2 then
+                    v_3:Update(arg2[i_2], v_3:GetTargetFrame(arg3), true, true)
+                end
+            end
+        end
+        arg1:HidePreviewCategories(TradingFrame_upvr.RecievingFrame.Inventory)
+    end
+    function any_CreateController_result1.PresentWarningWindow(arg1) -- Line 364
+        --[[ Upvalues[1]:
+            [1]: var9_upvw (read and write)
+        ]]
+        var9_upvw:SetCurrentWindow("AreYouSureSecret")
+    end
+    local CollectionService_upvr = game:GetService("CollectionService")
+    local TweenService_upvr = game:GetService("TweenService")
+    function any_CreateController_result1.HandleSelection(arg1) -- Line 368
+        --[[ Upvalues[12]:
+            [1]: CollectionService_upvr (readonly)
+            [2]: var8_upvw (read and write)
+            [3]: var10_upvw (read and write)
+            [4]: tick_result1_upvw (read and write)
+            [5]: TradingFrame_upvr (readonly)
+            [6]: var12_upvw (read and write)
+            [7]: tbl_upvw (read and write)
+            [8]: var21_upvw (read and write)
+            [9]: var13_upvw (read and write)
+            [10]: AmountSelector_upvr (readonly)
+            [11]: var9_upvw (read and write)
+            [12]: TweenService_upvr (readonly)
+        ]]
+        CollectionService_upvr:GetInstanceAddedSignal("Tradeable"):Connect(function(arg1_8) -- Line 369
+            --[[ Upvalues[12]:
+                [1]: var8_upvw (copied, read and write)
+                [2]: var10_upvw (copied, read and write)
+                [3]: arg1 (readonly)
+                [4]: tick_result1_upvw (copied, read and write)
+                [5]: TradingFrame_upvr (copied, readonly)
+                [6]: var12_upvw (copied, read and write)
+                [7]: tbl_upvw (copied, read and write)
+                [8]: var21_upvw (copied, read and write)
+                [9]: var13_upvw (copied, read and write)
+                [10]: AmountSelector_upvr (copied, readonly)
+                [11]: var9_upvw (copied, read and write)
+                [12]: TweenService_upvr (copied, readonly)
+            ]]
+            if arg1_8:FindFirstChild("ButtonDisplay") then
+                var8_upvw:WaitForInstance(arg1_8.ButtonDisplay):andThen(function(arg1_9) -- Line 371
+                    --[[ Upvalues[11]:
+                        [1]: arg1_8 (readonly)
+                        [2]: var10_upvw (copied, read and write)
+                        [3]: arg1 (copied, readonly)
+                        [4]: tick_result1_upvw (copied, read and write)
+                        [5]: TradingFrame_upvr (copied, readonly)
+                        [6]: var12_upvw (copied, read and write)
+                        [7]: tbl_upvw (copied, read and write)
+                        [8]: var21_upvw (copied, read and write)
+                        [9]: var13_upvw (copied, read and write)
+                        [10]: AmountSelector_upvr (copied, readonly)
+                        [11]: var9_upvw (copied, read and write)
+                    ]]
+                    arg1_9:AddCallback(function() -- Line 372
+                        --[[ Upvalues[11]:
+                            [1]: arg1_8 (copied, readonly)
+                            [2]: var10_upvw (copied, read and write)
+                            [3]: arg1 (copied, readonly)
+                            [4]: tick_result1_upvw (copied, read and write)
+                            [5]: TradingFrame_upvr (copied, readonly)
+                            [6]: var12_upvw (copied, read and write)
+                            [7]: tbl_upvw (copied, read and write)
+                            [8]: var21_upvw (copied, read and write)
+                            [9]: var13_upvw (copied, read and write)
+                            [10]: AmountSelector_upvr (copied, readonly)
+                            [11]: var9_upvw (copied, read and write)
+                        ]]
+                        local Selected = arg1_8:GetAttribute("Selected")
+                        if arg1_8:GetAttribute("IsEquipped") and arg1_8:GetAttribute("Service") == "MonsterService" then
+                            var10_upvw:New("Unequip this monster to trade it!", "Red")
+                        else
+                            if arg1_8:GetAttribute("Service") == "MonsterService" then
+                                if Selected then
+                                    arg1:RemoveFromTradeData(arg1_8)
+                                    arg1_8:SetAttribute("Selected", false)
+                                    tick_result1_upvw = tick()
+                                    TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                                else
+                                    local tbl = {}
+                                    for _, v_19 in var12_upvw.Data.MonsterService.SavedMonsters do
+                                        if tbl[v_19] then
+                                            tbl[v_19] += 1
+                                        else
+                                            tbl[v_19] = 1
+                                        end
+                                    end
+                                    for _, v_20 in var12_upvw.Data.MonsterService.MonstersUnlocked do
+                                        if tbl[v_20] then
+                                            tbl[v_20] += 1
+                                        else
+                                            tbl[v_20] = 1
+                                        end
+                                    end
+                                    print(arg1_8)
+                                    arg1:AddToTradeData(arg1_8)
+                                    tick_result1_upvw = tick()
+                                    TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                                    local tbl_3 = {}
+                                    if tbl_upvw.MonsterService and tbl_upvw.MonsterService.SavedMonsters then
+                                        for i_21, v_21 in tbl_upvw.MonsterService.SavedMonsters do
+                                            if tbl_3[v_21.Name] then
+                                                local Name_2 = v_21.Name
+                                                tbl_3[Name_2] += 1
+                                            else
+                                                tbl_3[v_21.Name] = 1
+                                            end
+                                        end
+                                    end
+                                    if tbl_upvw.MonsterService and tbl_upvw.MonsterService.MonstersUnlocked then
+                                        v_21 = tbl_upvw
+                                        i_21 = v_21.MonsterService
+                                        for _, v_22 in i_21.MonstersUnlocked do
+                                            if tbl_3[v_22.Name] then
+                                                local Name = v_22.Name
+                                                tbl_3[Name] += 1
+                                            else
+                                                tbl_3[v_22.Name] = 1
+                                            end
+                                        end
+                                    end
+                                    for i_23, v_23 in tbl do
+                                        local var95 = tbl_3[i_23] or 0
+                                        if 0 < var95 and v_23 <= var95 then
+                                            var21_upvw = arg1_8
+                                            arg1:PresentWarningWindow()
+                                            return
+                                        end
+                                    end
+                                    arg1_8:SetAttribute("Selected", true)
+                                end
+                            end
+                            local Quantity = arg1_8:GetAttribute("Quantity")
+                            if not Selected then
+                                if Quantity and 1 < Quantity then
+                                    var13_upvw = arg1_8
+                                    AmountSelector_upvr.Item.ButtonDisplay.ItemImageFrame.ItemImage.Image = arg1_8.ButtonDisplay.ItemImageFrame.ItemImage.Image
+                                    AmountSelector_upvr.Item.ButtonDisplay.Quantity.Text = 'x'..Quantity
+                                    AmountSelector_upvr.TextBoxBackground.TextBox.Text = Quantity
+                                    var9_upvw:SetCurrentWindow("AmountSelector")
+                                else
+                                    if arg1_8:GetAttribute("IsEquipped") then
+                                        var10_upvw:New("Unequip this item to trade it!", "Red")
+                                        return
+                                    end
+                                    arg1:AddToTradeData(arg1_8)
+                                    arg1_8:SetAttribute("Selected", true)
+                                    tick_result1_upvw = tick()
+                                    TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                                end
+                            end
+                            arg1:RemoveFromTradeData(arg1_8)
+                            arg1_8:SetAttribute("Selected", false)
+                            tick_result1_upvw = tick()
+                            TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                        end
+                    end)
+                end)
+            end
+            arg1_8:GetAttributeChangedSignal("Selected"):Connect(function() -- Line 495
+                --[[ Upvalues[2]:
+                    [1]: arg1_8 (readonly)
+                    [2]: TweenService_upvr (copied, readonly)
+                ]]
+                local SelectedIMG = arg1_8.ButtonDisplay.SelectedIMG
+                local var99 = arg1_8:GetAttribute("Selected") or false
+                SelectedIMG.Visible = var99
+                if var99 then
+                    SelectedIMG.UIScale.Scale = 0.75
+                    TweenService_upvr:Create(SelectedIMG.UIScale, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                        Scale = 1.05;
+                    }):Play()
+                end
+            end)
+        end)
+    end
+    function any_CreateController_result1.CreatePlayerFrame(arg1, arg2) -- Line 508
+        --[[ Upvalues[6]:
+            [1]: PlayerList_upvr (readonly)
+            [2]: var8_upvw (read and write)
+            [3]: var29_upvw (read and write)
+            [4]: var10_upvw (read and write)
+            [5]: var11_upvw (read and write)
+            [6]: Knit_upvr (readonly)
+        ]]
+        local clone = script.PlayerTemplate:Clone()
+        clone.PlayerUsername.Text = arg2.Name
+        clone.PlayerNickname.Text = arg2.DisplayName
+        clone.PlayerNickname.ItemName.Text = arg2.DisplayName
+        clone.Name = arg2.Name
+        local any_GetUserThumbnailAsync_result1_4, _ = game.Players:GetUserThumbnailAsync(arg2.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+        clone.PlayerImage.Image = any_GetUserThumbnailAsync_result1_4
+        clone.Parent = PlayerList_upvr.Inner.ScrollingFrame
+        local var104_upvw = false
+        var8_upvw:WaitForInstance(clone.TradeButton):andThen(function(arg1_10) -- Line 523
+            --[[ Upvalues[7]:
+                [1]: var29_upvw (copied, read and write)
+                [2]: var10_upvw (copied, read and write)
+                [3]: var104_upvw (read and write)
+                [4]: var11_upvw (copied, read and write)
+                [5]: arg2 (readonly)
+                [6]: arg1 (readonly)
+                [7]: Knit_upvr (copied, readonly)
+            ]]
+            arg1_10:AddCallback(function() -- Line 524
+                --[[ Upvalues[7]:
+                    [1]: var29_upvw (copied, read and write)
+                    [2]: var10_upvw (copied, read and write)
+                    [3]: var104_upvw (copied, read and write)
+                    [4]: var11_upvw (copied, read and write)
+                    [5]: arg2 (copied, readonly)
+                    [6]: arg1 (copied, readonly)
+                    [7]: Knit_upvr (copied, readonly)
+                ]]
+                if not var29_upvw then
+                    var10_upvw:New("You can't trade items!", "Red")
+                else
+                    if not var104_upvw then
+                        var11_upvw:SendTradeRequest(arg2.UserId):andThen(function(arg1_11) -- Line 535
+                            --[[ Upvalues[6]:
+                                [1]: var10_upvw (copied, read and write)
+                                [2]: arg2 (copied, readonly)
+                                [3]: var104_upvw (copied, read and write)
+                                [4]: var11_upvw (copied, read and write)
+                                [5]: arg1 (copied, readonly)
+                                [6]: Knit_upvr (copied, readonly)
+                            ]]
+                            if arg1_11 == nil then
+                                var10_upvw:New("Sent trade invite to "..arg2.DisplayName..'!', "Green")
+                                var104_upvw = true
+                                task.wait(10)
+                                var104_upvw = false
+                            elseif arg1_11 == true then
+                                var11_upvw:InitializeNewTrade(arg2.UserId):andThen(function(arg1_12) -- Line 546
+                                    --[[ Upvalues[3]:
+                                        [1]: arg1 (copied, readonly)
+                                        [2]: arg2 (copied, readonly)
+                                        [3]: Knit_upvr (copied, readonly)
+                                    ]]
+                                    if arg1_12 ~= nil then
+                                        arg1:OnTradeRequestAccepted(arg2.UserId)
+                                    end
+                                    Knit_upvr.PlayerGui.HUD.TradeInvites:ClearAllChildren()
+                                end)
+                            end
+                        end)
+                        return
+                    end
+                    var10_upvw:New("Already sent invite, try again later!", "Red")
+                end
+            end)
+        end)
+        var8_upvw:WaitForInstance(clone):andThen(function(arg1_13) -- Line 564
+            --[[ Upvalues[5]:
+                [1]: var29_upvw (copied, read and write)
+                [2]: var10_upvw (copied, read and write)
+                [3]: var104_upvw (read and write)
+                [4]: var11_upvw (copied, read and write)
+                [5]: arg2 (readonly)
+            ]]
+            arg1_13:AddCallback(function() -- Line 565
+                --[[ Upvalues[5]:
+                    [1]: var29_upvw (copied, read and write)
+                    [2]: var10_upvw (copied, read and write)
+                    [3]: var104_upvw (copied, read and write)
+                    [4]: var11_upvw (copied, read and write)
+                    [5]: arg2 (copied, readonly)
+                ]]
+                if not var29_upvw then
+                    var10_upvw:New("You can't trade items!", "Red")
+                else
+                    if not var104_upvw then
+                        var11_upvw:SendTradeRequest(arg2.UserId):andThen(function(arg1_14) -- Line 576
+                            --[[ Upvalues[3]:
+                                [1]: var10_upvw (copied, read and write)
+                                [2]: arg2 (copied, readonly)
+                                [3]: var104_upvw (copied, read and write)
+                            ]]
+                            if arg1_14 == nil then
+                                var10_upvw:New("Sent trade invite to "..arg2.DisplayName..'!', "Green")
+                                var104_upvw = true
+                                task.wait(10)
+                                var104_upvw = false
+                            end
+                        end)
+                        return
+                    end
+                    var10_upvw:New("Already sent invite, try again later!", "Red")
+                end
+            end)
+        end)
+    end
+    function any_CreateController_result1.UpdatePlayerList(arg1) -- Line 598
+        --[[ Upvalues[1]:
+            [1]: PlayerList_upvr (readonly)
+        ]]
+        for _, v_4 in game.Players:GetPlayers() do
+            if v_4 ~= game.Players.LocalPlayer then
+                arg1:CreatePlayerFrame(v_4)
+            end
+        end
+        game.Players.PlayerAdded:Connect(function(arg1_15) -- Line 606
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1:CreatePlayerFrame(arg1_15)
+        end)
+        game.Players.PlayerRemoving:Connect(function(arg1_16) -- Line 610
+            --[[ Upvalues[1]:
+                [1]: PlayerList_upvr (copied, readonly)
+            ]]
+            local SOME_2 = PlayerList_upvr.Inner.ScrollingFrame:FindFirstChild(arg1_16.Name)
+            if SOME_2 then
+                SOME_2:Destroy()
+            end
+        end)
+    end
+    function any_CreateController_result1.OnTradeRequestRecieved(arg1, arg2) -- Line 616
+        --[[ Upvalues[5]:
+            [1]: var29_upvw (read and write)
+            [2]: Knit_upvr (readonly)
+            [3]: var8_upvw (read and write)
+            [4]: var15_upvw (read and write)
+            [5]: var11_upvw (read and write)
+        ]]
+        if not var29_upvw then
+        else
+            local clone_3_upvr = script.TradeNoticication:Clone()
+            local Buttons_2 = clone_3_upvr.Buttons
+            local any_GetPlayerByUserId_result1_3 = game.Players:GetPlayerByUserId(arg2)
+            clone_3_upvr.MainText.Text = "Trade from @"..any_GetPlayerByUserId_result1_3.Name
+            clone_3_upvr.MainText.MainText.Text = "Trade from @"..any_GetPlayerByUserId_result1_3.Name
+            clone_3_upvr.Parent = Knit_upvr.PlayerGui.HUD.TradeInvites
+            clone_3_upvr.Visible = true
+            var8_upvw:WaitForInstance(Buttons_2.AcceptButton):andThen(function(arg1_17) -- Line 628
+                --[[ Upvalues[5]:
+                    [1]: var15_upvw (copied, read and write)
+                    [2]: var11_upvw (copied, read and write)
+                    [3]: arg2 (readonly)
+                    [4]: arg1 (readonly)
+                    [5]: Knit_upvr (copied, readonly)
+                ]]
+                arg1_17:AddCallback(function() -- Line 629
+                    --[[ Upvalues[5]:
+                        [1]: var15_upvw (copied, read and write)
+                        [2]: var11_upvw (copied, read and write)
+                        [3]: arg2 (copied, readonly)
+                        [4]: arg1 (copied, readonly)
+                        [5]: Knit_upvr (copied, readonly)
+                    ]]
+                    var15_upvw = game.Players.LocalPlayer.UserId
+                    var11_upvw:InitializeNewTrade(arg2):andThen(function(arg1_18) -- Line 631
+                        --[[ Upvalues[3]:
+                            [1]: arg1 (copied, readonly)
+                            [2]: arg2 (copied, readonly)
+                            [3]: Knit_upvr (copied, readonly)
+                        ]]
+                        if arg1_18 ~= nil then
+                            arg1:OnTradeRequestAccepted(arg2)
+                        end
+                        Knit_upvr.PlayerGui.HUD.TradeInvites:ClearAllChildren()
+                    end)
+                end)
+            end)
+            var8_upvw:WaitForInstance(Buttons_2.DeclineButton):andThen(function(arg1_19) -- Line 641
+                --[[ Upvalues[1]:
+                    [1]: clone_3_upvr (readonly)
+                ]]
+                arg1_19:AddCallback(function() -- Line 642
+                    --[[ Upvalues[1]:
+                        [1]: clone_3_upvr (copied, readonly)
+                    ]]
+                    clone_3_upvr:Destroy()
+                end)
+            end)
+            game.Debris:AddItem(clone_3_upvr, 10)
+        end
+    end
+    function any_CreateController_result1.InitalizeTradingFrame(arg1) -- Line 650
+        --[[ Upvalues[2]:
+            [1]: var14_upvw (read and write)
+            [2]: TradingFrame_upvr (readonly)
+        ]]
+        local any_GetPlayerByUserId_result1_2 = game.Players:GetPlayerByUserId(var14_upvw)
+        TradingFrame_upvr.TitleB.Text = any_GetPlayerByUserId_result1_2.DisplayName.."'s Offer"
+        TradingFrame_upvr.TitleB.TitleB.Text = any_GetPlayerByUserId_result1_2.DisplayName.."'s Offer"
+        local any_GetUserThumbnailAsync_result1, _ = game.Players:GetUserThumbnailAsync(game.Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+        TradingFrame_upvr.PlayerLogo.ImageLabel.ImageLabel.Image = any_GetUserThumbnailAsync_result1
+        local any_GetUserThumbnailAsync_result1_3, _ = game.Players:GetUserThumbnailAsync(var14_upvw, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+        TradingFrame_upvr.UserLogo.ImageLabel.ImageLabel.Image = any_GetUserThumbnailAsync_result1_3
+        TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "ACCEPT")
+    end
+    function any_CreateController_result1.OnTradeRequestAccepted(arg1, arg2) -- Line 664
+        --[[ Upvalues[5]:
+            [1]: var14_upvw (read and write)
+            [2]: var9_upvw (read and write)
+            [3]: var11_upvw (read and write)
+            [4]: var22_upvw (read and write)
+            [5]: TradingFrame_upvr (readonly)
+        ]]
+        var14_upvw = arg2
+        arg1:InitalizeTradingFrame()
+        arg1:SwitchMenu("ItemsWindow")
+        if var9_upvw.currentWindow ~= "TradingFrame" then
+            var9_upvw:SetCurrentWindow("TradingFrame")
+        end
+        local _, any_await_result2 = var11_upvw:CanTalkToOtherPlayers(arg2):await()
+        var22_upvw = any_await_result2
+        if not any_await_result2 then
+            TradingFrame_upvr.ChatBubbleToggle.Visible = false
+        end
+    end
+    local ColorSequence_new_result1_upvr_3 = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(111, 255, 157)), ColorSequenceKeypoint.new(0.687, Color3.fromRGB(47, 220, 102)), ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 189, 48))})
+    local ColorSequence_new_result1_upvr_2 = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 170, 174)), ColorSequenceKeypoint.new(1, Color3.fromRGB(191, 49, 64))})
+    local Color3_fromRGB_result1_upvr = Color3.fromRGB(44, 44, 44)
+    local ColorSequence_new_result1_upvr = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), ColorSequenceKeypoint.new(0.595, Color3.fromRGB(193, 193, 193)), ColorSequenceKeypoint.new(0.839, Color3.fromRGB(143, 143, 143)), ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 180, 180))})
+    function any_CreateController_result1.HandleTradeConfirmation(arg1) -- Line 683
+        --[[ Upvalues[17]:
+            [1]: TradingFrame_upvr (readonly)
+            [2]: var16_upvw (read and write)
+            [3]: var8_upvw (read and write)
+            [4]: var17_upvw (read and write)
+            [5]: tbl_upvw (read and write)
+            [6]: var11_upvw (read and write)
+            [7]: var15_upvw (read and write)
+            [8]: tick_result1_upvw (read and write)
+            [9]: var9_upvw (read and write)
+            [10]: var18_upvw (read and write)
+            [11]: AreYouSure_upvr (readonly)
+            [12]: Color3_fromRGB_result1_upvr_2 (readonly)
+            [13]: ColorSequence_new_result1_upvr_3 (readonly)
+            [14]: Color3_fromRGB_result1_upvr_3 (readonly)
+            [15]: ColorSequence_new_result1_upvr_2 (readonly)
+            [16]: Color3_fromRGB_result1_upvr (readonly)
+            [17]: ColorSequence_new_result1_upvr (readonly)
+        ]]
+        local AcceptButton_upvr = TradingFrame_upvr.AcceptButton
+        AcceptButton_upvr:SetAttribute("ButtonState", "ACCEPT")
+        var16_upvw = "ACCEPT"
+        var8_upvw:WaitForInstance(AcceptButton_upvr):andThen(function(arg1_20) -- Line 688
+            --[[ Upvalues[11]:
+                [1]: AcceptButton_upvr (readonly)
+                [2]: TradingFrame_upvr (copied, readonly)
+                [3]: var17_upvw (copied, read and write)
+                [4]: arg1 (readonly)
+                [5]: tbl_upvw (copied, read and write)
+                [6]: var16_upvw (copied, read and write)
+                [7]: var11_upvw (copied, read and write)
+                [8]: var15_upvw (copied, read and write)
+                [9]: tick_result1_upvw (copied, read and write)
+                [10]: var9_upvw (copied, read and write)
+                [11]: var18_upvw (copied, read and write)
+            ]]
+            arg1_20:AddCallback(function() -- Line 689
+                --[[ Upvalues[11]:
+                    [1]: AcceptButton_upvr (copied, readonly)
+                    [2]: TradingFrame_upvr (copied, readonly)
+                    [3]: var17_upvw (copied, read and write)
+                    [4]: arg1 (copied, readonly)
+                    [5]: tbl_upvw (copied, read and write)
+                    [6]: var16_upvw (copied, read and write)
+                    [7]: var11_upvw (copied, read and write)
+                    [8]: var15_upvw (copied, read and write)
+                    [9]: tick_result1_upvw (copied, read and write)
+                    [10]: var9_upvw (copied, read and write)
+                    [11]: var18_upvw (copied, read and write)
+                ]]
+                local ButtonState_2 = AcceptButton_upvr:GetAttribute("ButtonState")
+                if ButtonState_2 == "ACCEPT" then
+                    TradingFrame_upvr.Inventory.Visible = false
+                    TradingFrame_upvr.UserFrameReady.Visible = true
+                    TradingFrame_upvr.Buttons.Visible = false
+                    TradingFrame_upvr.UserFrameReady.Ready.Visible = true
+                    TradingFrame_upvr.UserFrameReady.Confirmed.Visible = false
+                    var17_upvw = true
+                    arg1:UpdateTradeOfferPreview(tbl_upvw, TradingFrame_upvr.UserFrameReady)
+                    arg1:HidePreviewCategories(TradingFrame_upvr.UserFrameReady.Inventory)
+                    var16_upvw = "CANCEL"
+                    var11_upvw:ToggleTradeAccept(var15_upvw, true, false)
+                    tick_result1_upvw = tick()
+                    TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                else
+                    if ButtonState_2 == "CONFIRM" then
+                        var9_upvw:SetCurrentWindow("AreYouSure")
+                        return
+                    end
+                    if ButtonState_2 == "CANCEL" then
+                        TradingFrame_upvr.Inventory.Visible = true
+                        TradingFrame_upvr.UserFrameReady.Visible = false
+                        TradingFrame_upvr.Buttons.Visible = true
+                        var16_upvw = "ACCEPT"
+                        tick_result1_upvw = tick()
+                        TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                        var11_upvw:ToggleTradeAccept(var15_upvw, false, false)
+                        var17_upvw = false
+                        var18_upvw = false
+                        return
+                    end
+                    if ButtonState_2 == "CANCEL_CONFIRM" then
+                        TradingFrame_upvr.Inventory.Visible = false
+                        TradingFrame_upvr.UserFrameReady.Visible = true
+                        TradingFrame_upvr.Buttons.Visible = false
+                        TradingFrame_upvr.UserFrameReady.Ready.Visible = true
+                        TradingFrame_upvr.UserFrameReady.Confirmed.Visible = false
+                        AcceptButton_upvr:SetAttribute("ButtonState", "CONFIRM")
+                        var16_upvw = "CONFIRM"
+                        var11_upvw:ToggleTradeAccept(var15_upvw, true, false)
+                        var17_upvw = true
+                        var18_upvw = false
+                    end
+                end
+            end)
+        end)
+        var8_upvw:WaitForInstance(AreYouSure_upvr.Buttons.AcceptButton):andThen(function(arg1_21) -- Line 739
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1_21:AddCallback(function() -- Line 740
+                --[[ Upvalues[1]:
+                    [1]: arg1 (copied, readonly)
+                ]]
+                arg1:OnAcceptPressed()
+            end)
+        end)
+        var8_upvw:WaitForInstance(AreYouSure_upvr.Buttons.DeclineButton):andThen(function(arg1_22) -- Line 745
+            --[[ Upvalues[1]:
+                [1]: var9_upvw (copied, read and write)
+            ]]
+            arg1_22:AddCallback(function() -- Line 746
+                --[[ Upvalues[1]:
+                    [1]: var9_upvw (copied, read and write)
+                ]]
+                var9_upvw:SetCurrentWindow("TradingFrame")
+            end)
+        end)
+        var8_upvw:WaitForInstance(AreYouSure_upvr.Exit):andThen(function(arg1_23) -- Line 751
+            --[[ Upvalues[1]:
+                [1]: var9_upvw (copied, read and write)
+            ]]
+            arg1_23:AddCallback(function() -- Line 752
+                --[[ Upvalues[1]:
+                    [1]: var9_upvw (copied, read and write)
+                ]]
+                var9_upvw:SetCurrentWindow("TradingFrame")
+            end)
+        end)
+        AcceptButton_upvr:GetAttributeChangedSignal("ButtonState"):Connect(function() -- Line 757
+            --[[ Upvalues[8]:
+                [1]: AcceptButton_upvr (readonly)
+                [2]: var16_upvw (copied, read and write)
+                [3]: Color3_fromRGB_result1_upvr_2 (copied, readonly)
+                [4]: ColorSequence_new_result1_upvr_3 (copied, readonly)
+                [5]: Color3_fromRGB_result1_upvr_3 (copied, readonly)
+                [6]: ColorSequence_new_result1_upvr_2 (copied, readonly)
+                [7]: Color3_fromRGB_result1_upvr (copied, readonly)
+                [8]: ColorSequence_new_result1_upvr (copied, readonly)
+            ]]
+            local ButtonState = AcceptButton_upvr:GetAttribute("ButtonState")
+            if ButtonState == "ACCEPT" then
+                var16_upvw = "ACCEPT"
+                AcceptButton_upvr["Discount Number"].Title.Text = "Ready"
+                AcceptButton_upvr["Discount Number"].Title.Title.Text = "Ready"
+                AcceptButton_upvr["Discount Number"].Title.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+                AcceptButton_upvr["Discount Number"].Title.Title.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+                AcceptButton_upvr.UIGradient.Color = ColorSequence_new_result1_upvr_3
+            else
+                if ButtonState == "CONFIRM" then
+                    var16_upvw = "CONFIRM"
+                    AcceptButton_upvr["Discount Number"].Title.Text = "Confirm"
+                    AcceptButton_upvr["Discount Number"].Title.Title.Text = "Confirm"
+                    AcceptButton_upvr["Discount Number"].Title.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+                    AcceptButton_upvr["Discount Number"].Title.Title.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+                    AcceptButton_upvr.UIGradient.Color = ColorSequence_new_result1_upvr_3
+                    return
+                end
+                if ButtonState == "CANCEL" then
+                    var16_upvw = "CANCEL"
+                    AcceptButton_upvr["Discount Number"].Title.Text = "Unready"
+                    AcceptButton_upvr["Discount Number"].Title.Title.Text = "Unready"
+                    AcceptButton_upvr["Discount Number"].Title.UIStroke.Color = Color3_fromRGB_result1_upvr_3
+                    AcceptButton_upvr["Discount Number"].Title.Title.UIStroke.Color = Color3_fromRGB_result1_upvr_3
+                    AcceptButton_upvr.UIGradient.Color = ColorSequence_new_result1_upvr_2
+                    return
+                end
+                if ButtonState == "CANCEL_CONFIRM" then
+                    var16_upvw = "CANCEL_CONFIRM"
+                    AcceptButton_upvr["Discount Number"].Title.Text = "Unconfirm"
+                    AcceptButton_upvr["Discount Number"].Title.Title.Text = "Unconfirm"
+                    AcceptButton_upvr["Discount Number"].Title.UIStroke.Color = Color3_fromRGB_result1_upvr_3
+                    AcceptButton_upvr["Discount Number"].Title.Title.UIStroke.Color = Color3_fromRGB_result1_upvr_3
+                    AcceptButton_upvr.UIGradient.Color = ColorSequence_new_result1_upvr_2
+                    return
+                end
+                if ButtonState == "DEBOUNCE" then
+                    AcceptButton_upvr["Discount Number"].Title.Text = ""
+                    AcceptButton_upvr["Discount Number"].Title.Title.Text = ""
+                    AcceptButton_upvr["Discount Number"].Title.UIStroke.Color = Color3_fromRGB_result1_upvr
+                    AcceptButton_upvr["Discount Number"].Title.Title.UIStroke.Color = Color3_fromRGB_result1_upvr
+                    AcceptButton_upvr.UIGradient.Color = ColorSequence_new_result1_upvr
+                end
+            end
+        end)
+    end
+    function any_CreateController_result1.OnAcceptPressed(arg1) -- Line 798
+        --[[ Upvalues[6]:
+            [1]: var11_upvw (read and write)
+            [2]: var15_upvw (read and write)
+            [3]: var18_upvw (read and write)
+            [4]: TradingFrame_upvr (readonly)
+            [5]: var16_upvw (read and write)
+            [6]: var9_upvw (read and write)
+        ]]
+        var11_upvw:ToggleTradeAccept(var15_upvw, true, true)
+        var18_upvw = true
+        TradingFrame_upvr.UserFrameReady.Ready.Visible = false
+        TradingFrame_upvr.UserFrameReady.Confirmed.Visible = true
+        TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "CANCEL_CONFIRM")
+        var16_upvw = "CANCEL_CONFIRM"
+        var9_upvw:SetCurrentWindow("TradingFrame")
+    end
+    function any_CreateController_result1.OnRecipientAcceptUpdated(arg1, arg2, arg3) -- Line 812
+        --[[ Upvalues[3]:
+            [1]: var19_upvw (read and write)
+            [2]: var20_upvw (read and write)
+            [3]: TradingFrame_upvr (readonly)
+        ]]
+        -- KONSTANTERROR: [0] 1. Error Block 1 start (CF ANALYSIS FAILED)
+        var19_upvw = arg2
+        var20_upvw = arg3
+        -- KONSTANTERROR: [0] 1. Error Block 1 end (CF ANALYSIS FAILED)
+        -- KONSTANTERROR: [28] 20. Error Block 3 start (CF ANALYSIS FAILED)
+        TradingFrame_upvr.RecievingFrame.Ready.Visible = false
+        TradingFrame_upvr.RecievingFrame.Confirmed.Visible = true
+        do
+            return
+        end
+        -- KONSTANTERROR: [28] 20. Error Block 3 end (CF ANALYSIS FAILED)
+        -- KONSTANTERROR: [45] 31. Error Block 4 start (CF ANALYSIS FAILED)
+        TradingFrame_upvr.RecievingFrame.Ready.Visible = false
+        TradingFrame_upvr.RecievingFrame.Confirmed.Visible = false
+        TradingFrame_upvr.RecievingFrame.UIGradient.Enabled = false
+        -- KONSTANTERROR: [45] 31. Error Block 4 end (CF ANALYSIS FAILED)
+    end
+    function any_CreateController_result1.HandleTradeCompleted(arg1) -- Line 839
+        --[[ Upvalues[4]:
+            [1]: var11_upvw (read and write)
+            [2]: var9_upvw (read and write)
+            [3]: var8_upvw (read and write)
+            [4]: TradeCompleted_upvr (readonly)
+        ]]
+        var11_upvw.TradeCompleted:Connect(function() -- Line 840
+            --[[ Upvalues[2]:
+                [1]: arg1 (readonly)
+                [2]: var9_upvw (copied, read and write)
+            ]]
+            arg1:CleanUp()
+            var9_upvw:SetCurrentWindow("TradeCompleted")
+        end)
+        var8_upvw:WaitForInstance(TradeCompleted_upvr.Buttons.AcceptButton):andThen(function(arg1_24) -- Line 845
+            --[[ Upvalues[1]:
+                [1]: var9_upvw (copied, read and write)
+            ]]
+            arg1_24:AddCallback(function() -- Line 846
+                --[[ Upvalues[1]:
+                    [1]: var9_upvw (copied, read and write)
+                ]]
+                var9_upvw:SetCurrentWindow(nil)
+            end)
+        end)
+    end
+    function any_CreateController_result1.HidePreviewCategories(arg1, arg2) -- Line 852
+        for _, v_5 in arg2:GetChildren() do
+            local var165
+            if var165 then
+                var165 = false
+                for _, v_6 in v_5:GetChildren() do
+                    if v_6:IsA("Frame") and v_6.Visible then
+                        var165 = true
+                    end
+                end
+                v_5.Visible = var165
+                local SOME = arg2:FindFirstChild(v_5.Name.."Text")
+                if SOME then
+                    SOME.Visible = var165
+                end
+            end
+        end
+    end
+    function any_CreateController_result1.CleanUp(arg1) -- Line 874
+        --[[ Upvalues[8]:
+            [1]: var15_upvw (read and write)
+            [2]: var14_upvw (read and write)
+            [3]: var19_upvw (read and write)
+            [4]: var20_upvw (read and write)
+            [5]: var17_upvw (read and write)
+            [6]: var18_upvw (read and write)
+            [7]: TradingFrame_upvr (readonly)
+            [8]: tbl_upvw (read and write)
+        ]]
+        var15_upvw = nil
+        var14_upvw = nil
+        var19_upvw = false
+        var20_upvw = false
+        var17_upvw = false
+        var18_upvw = false
+        TradingFrame_upvr.UserFrameReady.Visible = false
+        TradingFrame_upvr.Inventory.Visible = true
+        TradingFrame_upvr.Buttons.Visible = true
+        TradingFrame_upvr.RecievingFrame.Ready.Visible = false
+        TradingFrame_upvr.RecievingFrame.Confirmed.Visible = false
+        TradingFrame_upvr.RecievingFrame.UIGradient.Enabled = false
+        TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "ACCEPT")
+        for _, v_7 in TradingFrame_upvr.Inventory:GetDescendants() do
+            if v_7:HasTag("Tradeable") then
+                v_7:SetAttribute("Selected", false)
+            end
+        end
+        for _, v_8 in TradingFrame_upvr.RecievingFrame.Inventory:GetChildren() do
+            if v_8:IsA("Frame") then
+                for _, v_9 in v_8:GetChildren() do
+                    if v_9:IsA("Frame") then
+                        v_9:Destroy()
+                    end
+                end
+            end
+        end
+        for _, v_10 in TradingFrame_upvr.UserFrameReady.Inventory:GetChildren() do
+            if v_10:IsA("Frame") then
+                for _, v_11 in v_10:GetChildren() do
+                    if v_11:IsA("Frame") then
+                        v_11:Destroy()
+                    end
+                end
+            end
+        end
+        for _, v_12 in TradingFrame_upvr.Chat.Messages.ScrollableFrame:GetChildren() do
+            if v_12:IsA("Frame") then
+                v_12:Destroy()
+            end
+        end
+        for i_13, _ in tbl_upvw do
+            tbl_upvw[i_13] = {}
+        end
+        arg1:HidePreviewCategories(TradingFrame_upvr.RecievingFrame.Inventory)
+    end
+    function any_CreateController_result1.OnTradeCancelled(arg1) -- Line 924
+        --[[ Upvalues[3]:
+            [1]: var14_upvw (read and write)
+            [2]: CancelTrade_upvr (readonly)
+            [3]: var9_upvw (read and write)
+        ]]
+        local any_GetPlayerByUserId_result1 = game.Players:GetPlayerByUserId(var14_upvw)
+        if any_GetPlayerByUserId_result1 then
+            CancelTrade_upvr.SubText.Text = any_GetPlayerByUserId_result1.DisplayName.." cancelled the trade!"
+        else
+            CancelTrade_upvr.SubText.Text = "Recipient player left the server!"
+        end
+        arg1:CleanUp()
+        var9_upvw:SetCurrentWindow("CancelTrade")
+    end
+    local RunService_upvr = game:GetService("RunService")
+    function any_CreateController_result1.HandleTimers(arg1) -- Line 938
+        --[[ Upvalues[9]:
+            [1]: TradingFrame_upvr (readonly)
+            [2]: RunService_upvr (readonly)
+            [3]: tick_result1_upvw (read and write)
+            [4]: workspace_GetServerTimeNow_result1_upvw (read and write)
+            [5]: var16_upvw (read and write)
+            [6]: var17_upvw (read and write)
+            [7]: var18_upvw (read and write)
+            [8]: var20_upvw (read and write)
+            [9]: var19_upvw (read and write)
+        ]]
+        local StatusLabel_upvr = TradingFrame_upvr.StatusLabel
+        local TimerLabel_upvr = TradingFrame_upvr.TimerLabel
+        RunService_upvr.RenderStepped:Connect(function(arg1_25) -- Line 942
+            --[[ Upvalues[10]:
+                [1]: TradingFrame_upvr (copied, readonly)
+                [2]: tick_result1_upvw (copied, read and write)
+                [3]: workspace_GetServerTimeNow_result1_upvw (copied, read and write)
+                [4]: var16_upvw (copied, read and write)
+                [5]: var17_upvw (copied, read and write)
+                [6]: var18_upvw (copied, read and write)
+                [7]: var20_upvw (copied, read and write)
+                [8]: StatusLabel_upvr (readonly)
+                [9]: var19_upvw (copied, read and write)
+                [10]: TimerLabel_upvr (readonly)
+            ]]
+            -- KONSTANTERROR: [0] 1. Error Block 41 start (CF ANALYSIS FAILED)
+            local var207 = (3) - (tick() - tick_result1_upvw)
+            if TradingFrame_upvr.AcceptButton:GetAttribute("ButtonState") == "DEBOUNCE" then
+                if var207 <= 0 then
+                    TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", var16_upvw)
+                else
+                    local formatted = string.format("(%.1f)", var207)
+                    TradingFrame_upvr.AcceptButton["Discount Number"].Title.Text = formatted
+                    TradingFrame_upvr.AcceptButton["Discount Number"].Title.Title.Text = formatted
+                end
+            end
+            if not var17_upvw or var18_upvw and var20_upvw then
+                StatusLabel_upvr.Visible = false
+                -- KONSTANTWARNING: GOTO [125] #94
+            end
+            -- KONSTANTERROR: [0] 1. Error Block 41 end (CF ANALYSIS FAILED)
+            -- KONSTANTERROR: [71] 52. Error Block 36 start (CF ANALYSIS FAILED)
+            if var17_upvw and not var19_upvw then
+                StatusLabel_upvr.Text = "Waiting for other player to ready"
+                StatusLabel_upvr.StatusLabel.Text = "Waiting for other player to ready"
+                StatusLabel_upvr.Visible = true
+                -- KONSTANTWARNING: GOTO [125] #94
+            end
+            -- KONSTANTERROR: [71] 52. Error Block 36 end (CF ANALYSIS FAILED)
+        end)
+    end
+    function any_CreateController_result1.HandleToggleIgnoreTrades(arg1) -- Line 987
+        --[[ Upvalues[6]:
+            [1]: PlayerList_upvr (readonly)
+            [2]: Color3_fromRGB_result1_upvr_2 (readonly)
+            [3]: var8_upvw (read and write)
+            [4]: var11_upvw (read and write)
+            [5]: var10_upvw (read and write)
+            [6]: Color3_fromRGB_result1_upvr_3 (readonly)
+        ]]
+        local TextButton_upvr = PlayerList_upvr.RecieveRequests.TextButton
+        local Label_upvr = TextButton_upvr.Label
+        Label_upvr.Text = "On"
+        Label_upvr.Label.Text = "On"
+        Label_upvr.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+        Label_upvr.Label.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+        TextButton_upvr.OffGradient.Enabled = false
+        TextButton_upvr.OnGradient.Enabled = true
+        var8_upvw:WaitForInstance(TextButton_upvr):andThen(function(arg1_26) -- Line 999
+            --[[ Upvalues[6]:
+                [1]: var11_upvw (copied, read and write)
+                [2]: Label_upvr (readonly)
+                [3]: Color3_fromRGB_result1_upvr_2 (copied, readonly)
+                [4]: TextButton_upvr (readonly)
+                [5]: var10_upvw (copied, read and write)
+                [6]: Color3_fromRGB_result1_upvr_3 (copied, readonly)
+            ]]
+            arg1_26:AddCallback(function() -- Line 1000
+                --[[ Upvalues[6]:
+                    [1]: var11_upvw (copied, read and write)
+                    [2]: Label_upvr (copied, readonly)
+                    [3]: Color3_fromRGB_result1_upvr_2 (copied, readonly)
+                    [4]: TextButton_upvr (copied, readonly)
+                    [5]: var10_upvw (copied, read and write)
+                    [6]: Color3_fromRGB_result1_upvr_3 (copied, readonly)
+                ]]
+                var11_upvw:ToggleIgnoreTrades():andThen(function(arg1_27) -- Line 1001
+                    --[[ Upvalues[5]:
+                        [1]: Label_upvr (copied, readonly)
+                        [2]: Color3_fromRGB_result1_upvr_2 (copied, readonly)
+                        [3]: TextButton_upvr (copied, readonly)
+                        [4]: var10_upvw (copied, read and write)
+                        [5]: Color3_fromRGB_result1_upvr_3 (copied, readonly)
+                    ]]
+                    if not arg1_27 then
+                        Label_upvr.Text = "On"
+                        Label_upvr.Label.Text = "On"
+                        Label_upvr.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+                        Label_upvr.Label.UIStroke.Color = Color3_fromRGB_result1_upvr_2
+                        TextButton_upvr.OffGradient.Enabled = false
+                        TextButton_upvr.OnGradient.Enabled = true
+                        var10_upvw:New("Trade Requests: On", "Green")
+                    else
+                        Label_upvr.Text = "Off"
+                        Label_upvr.Label.Text = "Off"
+                        Label_upvr.UIStroke.Color = Color3_fromRGB_result1_upvr_3
+                        Label_upvr.Label.UIStroke.Color = Color3_fromRGB_result1_upvr_3
+                        TextButton_upvr.OffGradient.Enabled = true
+                        TextButton_upvr.OnGradient.Enabled = false
+                        var10_upvw:New("Trade Requests: Off", "Green")
+                    end
+                end)
+            end)
+        end)
+    end
+    function any_CreateController_result1.OnBothPlayersAccept(arg1, arg2, arg3) -- Line 1031
+        --[[ Upvalues[7]:
+            [1]: var17_upvw (read and write)
+            [2]: var18_upvw (read and write)
+            [3]: TradingFrame_upvr (readonly)
+            [4]: var11_upvw (read and write)
+            [5]: var15_upvw (read and write)
+            [6]: var16_upvw (read and write)
+            [7]: tick_result1_upvw (read and write)
+        ]]
+        print(arg2, arg3)
+        if arg2 then
+            print("A player backed out of accept")
+            var17_upvw = false
+            var18_upvw = false
+            TradingFrame_upvr.Inventory.Visible = true
+            TradingFrame_upvr.UserFrameReady.Visible = false
+            var11_upvw:ToggleTradeAccept(var15_upvw, false, false)
+            var16_upvw = "ACCEPT"
+            tick_result1_upvw = tick()
+            TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+        else
+            if arg3 then
+                print("A player backed out of confirm")
+                var17_upvw = true
+                var18_upvw = false
+                TradingFrame_upvr.UserFrameReady.Ready.Visible = true
+                TradingFrame_upvr.UserFrameReady.Confirmed.Visible = false
+                var11_upvw:ToggleTradeAccept(var15_upvw, true, false)
+                var16_upvw = "CONFIRM"
+                tick_result1_upvw = tick()
+                TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                return
+            end
+            if not arg2 and not arg3 then
+                print("Both players have ready'd")
+                var16_upvw = "CONFIRM"
+                tick_result1_upvw = tick()
+                TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+            end
+        end
+    end
+    function any_CreateController_result1.HandleCancelWhenExit(arg1) -- Line 1066
+        --[[ Upvalues[6]:
+            [1]: TradingFrame_upvr (readonly)
+            [2]: var15_upvw (read and write)
+            [3]: tbl_upvr_2 (readonly)
+            [4]: var9_upvw (read and write)
+            [5]: var11_upvw (read and write)
+            [6]: var10_upvw (read and write)
+        ]]
+        TradingFrame_upvr:GetPropertyChangedSignal("Visible"):Connect(function() -- Line 1067
+            --[[ Upvalues[7]:
+                [1]: TradingFrame_upvr (copied, readonly)
+                [2]: var15_upvw (copied, read and write)
+                [3]: tbl_upvr_2 (copied, readonly)
+                [4]: var9_upvw (copied, read and write)
+                [5]: var11_upvw (copied, read and write)
+                [6]: arg1 (readonly)
+                [7]: var10_upvw (copied, read and write)
+            ]]
+            if not TradingFrame_upvr.Visible and var15_upvw then
+                for _, v_14 in tbl_upvr_2 do
+                    if var9_upvw.currentWindow == v_14 then return end
+                end
+                var11_upvw:CancelTrade(var15_upvw)
+                arg1:CleanUp()
+                var10_upvw:New("You cancelled the trade!", "Red")
+            end
+        end)
+    end
+    local tbl_2_upvr = {}
+    function constructChatMessages(arg1) -- Line 1094
+        --[[ Upvalues[2]:
+            [1]: TradingFrame_upvr (readonly)
+            [2]: tbl_2_upvr (readonly)
+        ]]
+        -- KONSTANTWARNING: Variable analysis failed. Output will have some incorrect variable assignments
+        local ScrollableFrame_upvr = TradingFrame_upvr.Chat.Messages.ScrollableFrame
+        table.sort(arg1, function(arg1_29, arg2) -- Line 1100
+            local var266
+            if arg1_29.timestamp >= arg2.timestamp then
+                var266 = false
+            else
+                var266 = true
+            end
+            return var266
+        end)
+        for _, v_15 in ipairs(ScrollableFrame_upvr:GetChildren()) do
+            local ChatGUID_2 = v_15:GetAttribute("ChatGUID")
+            if ChatGUID_2 then
+                ({})[ChatGUID_2] = true
+            end
+        end
+        for _, v_16_upvr in arg1 do
+            -- KONSTANTERROR: Expression was reused, decompilation is incorrect
+            ChatGUID_2 = ({})[v_16_upvr.id]
+            local var271 = ChatGUID_2
+            if not var271 then
+                if v_16_upvr.playerId ~= game.Players.LocalPlayer.UserId then
+                    var271 = false
+                else
+                    var271 = true
+                end
+                if not var271 or not script.Chat.MyChatFrame then
+                end
+                local clone_upvr = script.Chat.TheirChatFrame:Clone()
+                clone_upvr:SetAttribute("ChatGUID", v_16_upvr.id)
+                clone_upvr.TextBoxBackground.TextLabel.Text = v_16_upvr.message
+                clone_upvr.LayoutOrder = v_16_upvr.timestamp
+                clone_upvr.Parent = ScrollableFrame_upvr
+                if not var271 then
+                    local var273 = tbl_2_upvr[v_16_upvr.playerId]
+                    if var273 then
+                        clone_upvr.ImageLabel.Image = var273
+                    else
+                        task.spawn(function() -- Line 1127
+                            --[[ Upvalues[3]:
+                                [1]: v_16_upvr (readonly)
+                                [2]: tbl_2_upvr (copied, readonly)
+                                [3]: clone_upvr (readonly)
+                            ]]
+                            local any_GetUserThumbnailAsync_result1_5, _ = game.Players:GetUserThumbnailAsync(v_16_upvr.playerId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+                            tbl_2_upvr[v_16_upvr.playerId] = any_GetUserThumbnailAsync_result1_5
+                            if clone_upvr and clone_upvr.Parent then
+                                clone_upvr.ImageLabel.Image = any_GetUserThumbnailAsync_result1_5
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+        task.defer(function() -- Line 1143
+            --[[ Upvalues[1]:
+                [1]: ScrollableFrame_upvr (readonly)
+            ]]
+            ScrollableFrame_upvr.CanvasPosition = Vector2.new(0, ScrollableFrame_upvr.CanvasSize.Y.Offset)
+        end)
+    end
+    local var278_upvw
+    local TradeFailed_upvr = script.TradeFailed
+    local TradeFailedFull_upvr = script.TradeFailedFull
+    local HelpfulFunctions_upvr = require(game.ReplicatedStorage.Shared.HelpfulFunctions)
+    function any_CreateController_result1.KnitStart(arg1) -- Line 1148
+        --[[ Upvalues[30]:
+            [1]: Knit_upvr (readonly)
+            [2]: var12_upvw (read and write)
+            [3]: var8_upvw (read and write)
+            [4]: var278_upvw (read and write)
+            [5]: var9_upvw (read and write)
+            [6]: var10_upvw (read and write)
+            [7]: var11_upvw (read and write)
+            [8]: tbl_upvr_2 (readonly)
+            [9]: TradingFrame_upvr (readonly)
+            [10]: AmountSelector_upvr (readonly)
+            [11]: PlayerList_upvr (readonly)
+            [12]: AreYouSure_upvr (readonly)
+            [13]: TradeCompleted_upvr (readonly)
+            [14]: CancelTrade_upvr (readonly)
+            [15]: TradeFailed_upvr (readonly)
+            [16]: TradeFailedFull_upvr (readonly)
+            [17]: tbl_upvr (readonly)
+            [18]: var21_upvw (read and write)
+            [19]: tick_result1_upvw (read and write)
+            [20]: var22_upvw (read and write)
+            [21]: var15_upvw (read and write)
+            [22]: var17_upvw (read and write)
+            [23]: var18_upvw (read and write)
+            [24]: var16_upvw (read and write)
+            [25]: var14_upvw (read and write)
+            [26]: workspace_GetServerTimeNow_result1_upvw (read and write)
+            [27]: var29_upvw (read and write)
+            [28]: tbl_upvw (read and write)
+            [29]: HelpfulFunctions_upvr (readonly)
+            [30]: tbl_4_upvr (readonly)
+        ]]
+        var12_upvw = Knit_upvr.GetController("ReplicaListener"):GetReplica()
+        var8_upvw = require(Knit_upvr.Components.Button)
+        var278_upvw = require(Knit_upvr.Components.ItemInfo)
+        var9_upvw = Knit_upvr.GetController("WindowController")
+        var10_upvw = Knit_upvr.GetController("NotificationController")
+        var11_upvw = Knit_upvr.GetService("TradingService")
+        for _, v_17 in script:GetChildren() do
+            if v_17:IsA("ImageLabel") then
+                table.insert(tbl_upvr_2, v_17.Name)
+            end
+        end
+        table.insert(tbl_upvr_2, "AreYouSureSecret")
+        TradingFrame_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        AmountSelector_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        PlayerList_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        AreYouSure_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        TradeCompleted_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        CancelTrade_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        TradeFailed_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        TradeFailedFull_upvr.Parent = Knit_upvr.PlayerGui:WaitForChild("Windows")
+        arg1:UpdatePlayerList()
+        arg1:HandleMenuSwitching()
+        arg1:HandleAmountSelector()
+        arg1:HandleSelection()
+        arg1:HandleTradeConfirmation()
+        arg1:HandleTradeCompleted()
+        arg1:HandleTimers()
+        arg1:HandleToggleIgnoreTrades()
+        arg1:HandleCancelWhenExit()
+        arg1:HidePreviewCategories(TradingFrame_upvr.RecievingFrame.Inventory)
+        arg1:HidePreviewCategories(TradingFrame_upvr.UserFrameReady.Inventory)
+        for i_18_upvw, v_18_upvr in script.Tradeables:GetChildren() do
+            local v_18_upvr_2 = require(v_18_upvr)
+            tbl_upvr[i_18_upvw] = v_18_upvr_2
+            v_18_upvr_2:Construct()
+        end
+        v_18_upvr = game.Players.LocalPlayer.PlayerGui
+        i_18_upvw = v_18_upvr.Windows
+        v_18_upvr = game.Players.LocalPlayer.PlayerGui.Windows
+        i_18_upvw = v_18_upvr.AreYouSureSecret
+        v_18_upvr = game.Players.LocalPlayer.PlayerGui.Windows
+        i_18_upvw = v_18_upvr.AreYouSureSecret
+        i_18_upvw = var8_upvw:WaitForInstance(i_18_upvw.AreYouSureSecret.Buttons.AcceptButton)
+        i_18_upvw = i_18_upvw:andThen
+        i_18_upvw(function(arg1_30) -- Line 1196
+            --[[ Upvalues[2]:
+                [1]: var21_upvw (copied, read and write)
+                [2]: var9_upvw (copied, read and write)
+            ]]
+            arg1_30:AddCallback(function() -- Line 1197
+                --[[ Upvalues[2]:
+                    [1]: var21_upvw (copied, read and write)
+                    [2]: var9_upvw (copied, read and write)
+                ]]
+                var21_upvw:SetAttribute("Selected", true)
+                var9_upvw:SetCurrentWindow("TradingFrame")
+            end)
+        end)
+        i_18_upvw = var8_upvw:WaitForInstance(i_18_upvw.Buttons.DeclineButton)
+        i_18_upvw = i_18_upvw:andThen
+        i_18_upvw(function(arg1_31) -- Line 1203
+            --[[ Upvalues[5]:
+                [1]: var21_upvw (copied, read and write)
+                [2]: var9_upvw (copied, read and write)
+                [3]: arg1 (readonly)
+                [4]: tick_result1_upvw (copied, read and write)
+                [5]: TradingFrame_upvr (copied, readonly)
+            ]]
+            arg1_31:AddCallback(function() -- Line 1204
+                --[[ Upvalues[5]:
+                    [1]: var21_upvw (copied, read and write)
+                    [2]: var9_upvw (copied, read and write)
+                    [3]: arg1 (copied, readonly)
+                    [4]: tick_result1_upvw (copied, read and write)
+                    [5]: TradingFrame_upvr (copied, readonly)
+                ]]
+                var21_upvw:SetAttribute("Selected", false)
+                var9_upvw:SetCurrentWindow("TradingFrame")
+                arg1:RemoveFromTradeData(var21_upvw)
+                var21_upvw:SetAttribute("Selected", false)
+                tick_result1_upvw = tick()
+                TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+            end)
+        end)
+        i_18_upvw = var8_upvw:WaitForInstance(i_18_upvw.Exit)
+        i_18_upvw = i_18_upvw:andThen
+        i_18_upvw(function(arg1_32) -- Line 1214
+            --[[ Upvalues[5]:
+                [1]: var21_upvw (copied, read and write)
+                [2]: var9_upvw (copied, read and write)
+                [3]: arg1 (readonly)
+                [4]: tick_result1_upvw (copied, read and write)
+                [5]: TradingFrame_upvr (copied, readonly)
+            ]]
+            arg1_32:AddCallback(function() -- Line 1215
+                --[[ Upvalues[5]:
+                    [1]: var21_upvw (copied, read and write)
+                    [2]: var9_upvw (copied, read and write)
+                    [3]: arg1 (copied, readonly)
+                    [4]: tick_result1_upvw (copied, read and write)
+                    [5]: TradingFrame_upvr (copied, readonly)
+                ]]
+                var21_upvw:SetAttribute("Selected", false)
+                var9_upvw:SetCurrentWindow("TradingFrame")
+                arg1:RemoveFromTradeData(var21_upvw)
+                var21_upvw:SetAttribute("Selected", false)
+                tick_result1_upvw = tick()
+                TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+            end)
+        end)
+        i_18_upvw = ""
+        v_18_upvr = var8_upvw:WaitForInstance(TradingFrame_upvr.ChatBubbleToggle)
+        v_18_upvr = v_18_upvr:andThen
+        v_18_upvr(function(arg1_33) -- Line 1227
+            --[[ Upvalues[2]:
+                [1]: var22_upvw (copied, read and write)
+                [2]: TradingFrame_upvr (copied, readonly)
+            ]]
+            arg1_33:AddCallback(function() -- Line 1228
+                --[[ Upvalues[2]:
+                    [1]: var22_upvw (copied, read and write)
+                    [2]: TradingFrame_upvr (copied, readonly)
+                ]]
+                if not var22_upvw then
+                else
+                    local var301 = not TradingFrame_upvr.Chat.Visible
+                    TradingFrame_upvr.Chat.Visible = var301
+                    TradingFrame_upvr.ChatBubbleToggle.i.Visible = false
+                    TradingFrame_upvr.TitleA.Visible = not var301
+                    TradingFrame_upvr.TitleB.Visible = not var301
+                    TradingFrame_upvr.Buttons.Visible = not var301
+                    TradingFrame_upvr.ImageLabel.Visible = not var301
+                    TradingFrame_upvr.PlayerLogo.Visible = not var301
+                    TradingFrame_upvr.UserLogo.Visible = not var301
+                end
+            end)
+        end)
+        v_18_upvr = var8_upvw:WaitForInstance(TradingFrame_upvr.Chat.SendButton)
+        v_18_upvr = v_18_upvr:andThen
+        v_18_upvr(function(arg1_34) -- Line 1247
+            --[[ Upvalues[4]:
+                [1]: i_18_upvw (read and write)
+                [2]: var10_upvw (copied, read and write)
+                [3]: var11_upvw (copied, read and write)
+                [4]: var15_upvw (copied, read and write)
+            ]]
+            arg1_34:AddCallback(function() -- Line 1248
+                --[[ Upvalues[4]:
+                    [1]: i_18_upvw (copied, read and write)
+                    [2]: var10_upvw (copied, read and write)
+                    [3]: var11_upvw (copied, read and write)
+                    [4]: var15_upvw (copied, read and write)
+                ]]
+                if i_18_upvw == "" then
+                    var10_upvw:New("You can't send a blank message!", "Red")
+                else
+                    local any_await_result1, any_await_result2_2 = var11_upvw:SendMessage(var15_upvw, i_18_upvw):await()
+                    if any_await_result1 then
+                        constructChatMessages(any_await_result2_2)
+                    end
+                end
+            end)
+        end)
+        v_18_upvr = TradingFrame_upvr.Chat.TextBoxBackground.TextBox
+        local SendButton_upvr = TradingFrame_upvr.Chat.SendButton
+        SendButton_upvr.UIGradient_ON.Enabled = false
+        SendButton_upvr.UIGradient_OFF.Enabled = true
+        TradingFrame_upvr.ChatBubbleToggle.i.Visible = false
+        v_18_upvr:GetPropertyChangedSignal("Text"):Connect(function() -- Line 1269
+            --[[ Upvalues[3]:
+                [1]: v_18_upvr (readonly)
+                [2]: SendButton_upvr (readonly)
+                [3]: i_18_upvw (read and write)
+            ]]
+            if 128 < #v_18_upvr.Text then
+                v_18_upvr.Text = string.sub(v_18_upvr.Text, 1, 128)
+                v_18_upvr.CursorPosition = 129
+            end
+            if v_18_upvr.Text == "" then
+                SendButton_upvr.UIGradient_ON.Enabled = false
+                SendButton_upvr.UIGradient_OFF.Enabled = true
+            else
+                SendButton_upvr.UIGradient_ON.Enabled = true
+                SendButton_upvr.UIGradient_OFF.Enabled = false
+            end
+            i_18_upvw = v_18_upvr.Text
+        end)
+        var11_upvw.TradeMessageReceived:Connect(function(arg1_35) -- Line 1286
+            --[[ Upvalues[1]:
+                [1]: TradingFrame_upvr (copied, readonly)
+            ]]
+            if not TradingFrame_upvr.Chat.Visible then
+                TradingFrame_upvr.ChatBubbleToggle.i.Visible = true
+            end
+            constructChatMessages(arg1_35)
+        end)
+        var8_upvw:WaitForInstance(TradingFrame_upvr.DeclineButton):andThen(function(arg1_36) -- Line 1294
+            --[[ Upvalues[11]:
+                [1]: var17_upvw (copied, read and write)
+                [2]: var18_upvw (copied, read and write)
+                [3]: TradingFrame_upvr (copied, readonly)
+                [4]: var11_upvw (copied, read and write)
+                [5]: var15_upvw (copied, read and write)
+                [6]: var16_upvw (copied, read and write)
+                [7]: tick_result1_upvw (copied, read and write)
+                [8]: var14_upvw (copied, read and write)
+                [9]: arg1 (readonly)
+                [10]: var9_upvw (copied, read and write)
+                [11]: var10_upvw (copied, read and write)
+            ]]
+            arg1_36:AddCallback(function() -- Line 1295
+                --[[ Upvalues[11]:
+                    [1]: var17_upvw (copied, read and write)
+                    [2]: var18_upvw (copied, read and write)
+                    [3]: TradingFrame_upvr (copied, readonly)
+                    [4]: var11_upvw (copied, read and write)
+                    [5]: var15_upvw (copied, read and write)
+                    [6]: var16_upvw (copied, read and write)
+                    [7]: tick_result1_upvw (copied, read and write)
+                    [8]: var14_upvw (copied, read and write)
+                    [9]: arg1 (copied, readonly)
+                    [10]: var9_upvw (copied, read and write)
+                    [11]: var10_upvw (copied, read and write)
+                ]]
+                if var17_upvw and var18_upvw then
+                    TradingFrame_upvr.Inventory.Visible = false
+                    TradingFrame_upvr.UserFrameReady.Visible = true
+                    TradingFrame_upvr.Buttons.Visible = false
+                    TradingFrame_upvr.UserFrameReady.Ready.Visible = true
+                    TradingFrame_upvr.UserFrameReady.Confirmed.Visible = false
+                    TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "CONFIRM")
+                    var11_upvw:ToggleTradeAccept(var15_upvw, true, false)
+                    var17_upvw = true
+                    var18_upvw = false
+                else
+                    if var17_upvw then
+                        TradingFrame_upvr.Inventory.Visible = true
+                        TradingFrame_upvr.UserFrameReady.Visible = false
+                        TradingFrame_upvr.Buttons.Visible = true
+                        var16_upvw = "ACCEPT"
+                        tick_result1_upvw = tick()
+                        TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+                        var11_upvw:ToggleTradeAccept(var15_upvw, false, false)
+                        var17_upvw = false
+                        var18_upvw = false
+                        return
+                    end
+                    var11_upvw:CancelTrade(var15_upvw)
+                    var15_upvw = nil
+                    var14_upvw = nil
+                    arg1:CleanUp()
+                    var9_upvw:SetCurrentWindow(nil)
+                    var10_upvw:New("You cancelled the trade!", "Red")
+                end
+            end)
+        end)
+        var11_upvw.TradeRequestRecieved:Connect(function(arg1_37) -- Line 1337
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1:OnTradeRequestRecieved(arg1_37)
+        end)
+        var11_upvw.TradeRequestAccepted:Connect(function(arg1_38) -- Line 1341
+            --[[ Upvalues[2]:
+                [1]: var15_upvw (copied, read and write)
+                [2]: arg1 (readonly)
+            ]]
+            var15_upvw = arg1_38.playerOneId
+            arg1:OnTradeRequestAccepted(arg1_38.playerOneId)
+        end)
+        var11_upvw.TradeOfferUpdated:Connect(function(arg1_39) -- Line 1346
+            --[[ Upvalues[3]:
+                [1]: tick_result1_upvw (copied, read and write)
+                [2]: TradingFrame_upvr (copied, readonly)
+                [3]: arg1 (readonly)
+            ]]
+            tick_result1_upvw = tick()
+            TradingFrame_upvr.AcceptButton:SetAttribute("ButtonState", "DEBOUNCE")
+            arg1:UpdateTradeOfferPreview(arg1_39, TradingFrame_upvr.RecievingFrame.Inventory)
+        end)
+        var11_upvw.TradeCancelled:Connect(function() -- Line 1351
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1:OnTradeCancelled()
+        end)
+        var11_upvw.TradeFailed:Connect(function() -- Line 1355
+            --[[ Upvalues[2]:
+                [1]: arg1 (readonly)
+                [2]: var9_upvw (copied, read and write)
+            ]]
+            arg1:CleanUp()
+            var9_upvw:SetCurrentWindow("TradeFailed")
+        end)
+        var11_upvw.TradeAcceptUpdated:Connect(function(arg1_40, arg2, arg3, arg4) -- Line 1360
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1:OnRecipientAcceptUpdated(arg1_40, arg2, arg3, arg4)
+        end)
+        var11_upvw.BothPlayersReady:Connect(function(arg1_41, arg2) -- Line 1364
+            --[[ Upvalues[1]:
+                [1]: arg1 (readonly)
+            ]]
+            arg1:OnBothPlayersAccept(arg1_41, arg2)
+        end)
+        var11_upvw.StartTradeCountdown:Connect(function(arg1_42) -- Line 1368
+            --[[ Upvalues[1]:
+                [1]: workspace_GetServerTimeNow_result1_upvw (copied, read and write)
+            ]]
+            workspace_GetServerTimeNow_result1_upvw = arg1_42
+        end)
+        var11_upvw.TradeFailedFull:Connect(function(arg1_43) -- Line 1372
+            --[[ Upvalues[3]:
+                [1]: arg1 (readonly)
+                [2]: TradeFailedFull_upvr (copied, readonly)
+                [3]: var9_upvw (copied, read and write)
+            ]]
+            arg1:CleanUp()
+            TradeFailedFull_upvr.SubText.Text = arg1_43
+            var9_upvw:SetCurrentWindow("TradeFailedFull")
+        end)
+        if var29_upvw and 2 < var12_upvw.Data.Currencies.Rebirths then
+            Knit_upvr.PlayerGui:WaitForChild("HUD").RightBuffs.PlayerList.Visible = var29_upvw
+        end
+        tbl_upvw = HelpfulFunctions_upvr.ShallowCopy(tbl_4_upvr)
+    end
+    return any_CreateController_result1
+end)()
+if newController and newController.KnitStart then
+    -- ปิด Controller ตัวเก่าของเกมก่อน (ถ้าทำได้) เพื่อไม่ให้ตีกัน
+    pcall(function()
+        local Knit = require(game.ReplicatedStorage.Packages.Knit)
+        local Old = Knit.GetController("TradeController")
+        -- ตรงนี้อาจจะปิดยากหน่อยในบางเกม แต่ลองรันตัวใหม่ทับไปเลย
+    end)
+
+    newController:KnitStart()
+    print("TradeController ตัวใหม่ติดตั้งสำเร็จแล้ว!")
+else
+    warn("ติดตั้งไม่สำเร็จ: หา Controller ไม่เจอ")
+end
