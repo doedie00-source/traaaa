@@ -443,32 +443,19 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         btn.Size = UDim2.new(0, 100, 0, 100)
         btn.BackgroundTransparency = 1
         
-        -- [[ ตั้งค่าพื้นฐานที่ทุกไอเทมต้องมี ]] --
-        btn:SetAttribute("Service", itemData.Service) -- เช่น CratesService
-        btn:SetAttribute("Index", itemData.Name)      -- ชื่อของ ต้องตรงกับ Index ใน Inventory
-        btn:SetAttribute("Quantity", tonumber(amount)) -- บังคับเป็นตัวเลข
+        btn:SetAttribute("Service", itemData.Service)
+        btn:SetAttribute("Index", itemData.Name) 
+        btn:SetAttribute("Quantity", amount)
         btn:SetAttribute("IsEquipped", false)
-        
-        -- [[ 🔴 จุดที่แก้: ต้องใส่ Category ให้เกมรู้ว่าเป็นประเภทไหน ]] --
-        if itemData.Category then
-            btn:SetAttribute("Category", itemData.Category)
-        end
         
         -- [[ Special Logic for Crates ]]
         if itemData.Category == "Crates" then
-             -- ถ้าเป็นโหมด Dupe (ของปลอม)
-             if itemData.IsDupe then
-                 btn:SetAttribute("ItemName", itemData.Name)
-                 btn:SetAttribute("Name", itemData.Name)
-                 btn:SetAttribute("Amount", tonumber(amount))
-                 btn:SetAttribute("Class", "Crate") -- บางเกมเช็คตรงนี้
-             else
-                 -- ถ้าเป็น Hidden Trade (ของจริง)
-                 -- ปกติไม่ต้องเพิ่มอะไร ถ้า Index กับ Service ถูกต้อง มันจะดึงของจริงเอง
-             end
+             btn:SetAttribute("ItemName", itemData.Name)
+             btn:SetAttribute("Name", itemData.Name)
+             btn:SetAttribute("Amount", amount)
+             btn:SetAttribute("Service", "CratesService")
         end
 
-        -- [[ Optionals for Pets/Items ]]
         if itemData.Guid then btn:SetAttribute("Guid", tostring(itemData.Guid)) end
         if itemData.RawInfo then
             if itemData.RawInfo.Evolution then btn:SetAttribute("Evolution", itemData.RawInfo.Evolution) end
@@ -486,18 +473,14 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         return
     end
     
-    -- ส่วนการส่งข้อมูลเข้า Controller
     pcall(function()
         local key = itemData.Guid or itemData.Name
         if action == "Add" then
-            -- ลองส่งข้อมูล 2 แบบ กันพลาด
-            pcall(function() TradeController:AddToTradeData(fakeBtn, tonumber(amount)) end)
-            
+            TradeController:AddToTradeData(fakeBtn, amount)
             StateManager:AddToTrade(key, itemData)
             StateManager:SetStatus("✅ Added: " .. itemData.Name, THEME.ItemInv, statusLabel)
         elseif action == "Remove" then
-            pcall(function() TradeController:RemoveFromTradeData(fakeBtn, tonumber(amount)) end)
-            
+            TradeController:RemoveFromTradeData(fakeBtn, amount)
             StateManager:RemoveFromTrade(key)
             StateManager:SetStatus("🗑️ Removed: " .. itemData.Name, THEME.ItemEquip, statusLabel)
         end
@@ -711,8 +694,7 @@ function InventoryManager.CollectItems(category, playerData)
         for guid, info in pairs(path or {}) do
             local name = (type(info) == "table" and info.Name) or info
             if Utils.IsHidden(name, category) then
-                -- 👇 แก้เลข 1 เป็นตัวแปร guid เพื่อให้แต่ละชิ้นมี ID ไม่ซ้ำกัน
-                addItem(name, 1, guid, "Normal", Utils.CheckIsEquipped(guid, name, category, playerData), service, info, Utils.GetItemDetails(info, category))
+                addItem(name, 1, 1, "Normal", Utils.CheckIsEquipped(guid, name, category, playerData), service, info, Utils.GetItemDetails(info, category))
             end
         end
     end
@@ -1165,12 +1147,12 @@ function GUI:RefreshInventory()
 end
 
 function GUI:RenderCrateGrid()
-    -- ตั้งค่าพื้นฐานของ ScrollingFrame
-    self.InvContainer.ScrollBarThickness = 0
+    -- ✅ 1. แก้ไข ScrollBar
+    self.InvContainer.ScrollBarThickness = 3  -- เปลี่ยนจาก 0 เป็น 3
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
-    -- ดึงข้อมูลจาก Inventory เพื่อตรวจสอบว่ากล่องไหนมีอยู่แล้ว (แม้จะเป็น 0 ก็ตาม)
+    -- ✅ 2. ดึงข้อมูล Inventory
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
     local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
@@ -1180,7 +1162,9 @@ function GUI:RenderCrateGrid()
     padding.PaddingTop = UDim.new(0, 15) 
     padding.PaddingBottom = UDim.new(0, 20)
     
-    if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
+    if self.InvContainer:FindFirstChild("UIListLayout") then 
+        self.InvContainer.UIListLayout:Destroy() 
+    end
     
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
     if not layout then
@@ -1191,23 +1175,38 @@ function GUI:RenderCrateGrid()
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
-    -- กรองรายชื่อกล่อง
+    -- ✅ 3. กรองเฉพาะ Hidden Crates
     local cratesList = {}
     for name, info in pairs(CratesInfo) do
         if type(info) == "table" then
             local crateName = info.Name or name
-            if crateName ~= "KeKa Crate" then 
+            -- ✅ ใช้ Utils.IsHidden แทน
+            if Utils.IsHidden(crateName, "Crates") then
                 table.insert(cratesList, {Name = crateName, Image = info.Image or "0"})
             end
         end
     end
     table.sort(cratesList, function(a, b) return a.Name < b.Name end)
 
+    -- ✅ 4. Blacklist ที่ชัดเจน
+    local CRATE_BLACKLIST = {
+        "Starter Crate",
+        "KeKa Crate",
+    }
+    
+    local function isBlacklisted(crateName)
+        for _, blackName in ipairs(CRATE_BLACKLIST) do
+            if crateName == blackName then return true end
+        end
+        return false
+    end
+
     -- วนลูปสร้างการ์ดแต่ละใบ
     for _, crate in ipairs(cratesList) do
-        -- ตรวจสอบเงื่อนไข: มีในกระเป๋าไหม และ ถูกเลือกอยู่ไหม
-        local isNotSpawnable = inventoryCrates[crate.Name] ~= nil
+        -- ✅ 5. ตรวจสอบเงื่อนไขที่ถูกต้อง
+        local isOwned = (inventoryCrates[crate.Name] ~= nil and inventoryCrates[crate.Name] > 0)
         local isSelected = StateManager.selectedCrates[crate.Name] ~= nil
+        local isBlacklistedCrate = isBlacklisted(crate.Name)
 
         local Card = Instance.new("Frame")
         Card.Name = crate.Name
@@ -1215,19 +1214,20 @@ function GUI:RenderCrateGrid()
         Card.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
         UIFactory.AddCorner(Card, 6)
         
-        -- กำหนดสีขอบเริ่มต้น (ถ้ามีในกระเป๋าจะเป็นสีแดง)
-        local strokeColor = Color3.fromRGB(55, 55, 60)
-        if isNotSpawnable then
-            strokeColor = Color3.fromRGB(255, 85, 85) -- สีแดงเตือน
-        end
+        -- กำหนดสีขอบ
+        local strokeColor = Color3.fromRGB(55, 55, 60)  -- Default
         
-        -- ถ้าถูกเลือกอยู่ สีเขียวจะทับสีอื่น
-        if isSelected then
-            strokeColor = THEME.CrateSelected
+        if isBlacklistedCrate then
+            strokeColor = Color3.fromRGB(100, 100, 100)  -- สีเทา (Blacklist)
+        elseif isOwned then
+            strokeColor = Color3.fromRGB(255, 85, 85)  -- สีแดง (มีในกระเป๋า)
+        elseif isSelected then
+            strokeColor = THEME.CrateSelected  -- สีเขียว (ถูกเลือก)
         end
 
         local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, 0.2)
         
+        -- รูปภาพ
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
@@ -1238,6 +1238,7 @@ function GUI:RenderCrateGrid()
         Image.Image = imgId
         Image.ScaleType = Enum.ScaleType.Fit
         
+        -- ชื่อ
         local NameLbl = Instance.new("TextLabel")
         NameLbl.Parent = Card
         NameLbl.BackgroundTransparency = 1
@@ -1246,12 +1247,14 @@ function GUI:RenderCrateGrid()
         NameLbl.Font = Enum.Font.Gotham
         NameLbl.Text = crate.Name
         
-        -- ปรับสีตัวหนังสือให้เข้ากับสถานะ
-        if isSelected then
+        -- ปรับสีตัวหนังสือ
+        if isBlacklistedCrate then
+            NameLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+        elseif isSelected then
             NameLbl.Text = crate.Name .. "\n[x" .. StateManager.selectedCrates[crate.Name] .. "]"
             NameLbl.TextColor3 = THEME.CrateSelected
-        elseif isNotSpawnable then
-            NameLbl.TextColor3 = Color3.fromRGB(255, 150, 150) -- สีแดงจางๆ
+        elseif isOwned then
+            NameLbl.TextColor3 = Color3.fromRGB(255, 150, 150)
         else
             NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
@@ -1260,7 +1263,7 @@ function GUI:RenderCrateGrid()
         NameLbl.TextWrapped = true
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
 
-        -- จัดการปุ่มคลิกและการส่งสัญญาณเทรด
+        -- ✅ 6. จัดการปุ่มคลิก
         local ClickBtn = Instance.new("TextButton")
         ClickBtn.Parent = Card
         ClickBtn.BackgroundTransparency = 1
@@ -1272,36 +1275,37 @@ function GUI:RenderCrateGrid()
                 return
             end
 
-            -- [[ 🔴 จุดที่ต้องเพิ่ม: เช็คเงื่อนไขห้ามกด ]] --
+            -- ✅ CRITICAL: ตรวจสอบเงื่อนไขห้ามกด
             
-            -- 1. ถ้ามีของอยู่แล้ว (isNotSpawnable) ให้หยุดเลย กันพลาดเทรดของจริงหาย
-            if isNotSpawnable then
-                -- ถ้ามีของอยู่แล้ว ให้แจ้งเตือนและหยุดทำงานทันที (ป้องกันบัคทับซ้อน)
-                StateManager:SetStatus("❌ มีของชิ้นนี้อยู่แล้ว! (ให้ไปใช้หน้า Trade)", Color3.fromRGB(255, 85, 85), self.StatusLabel)
-                return -- สั่งหยุดทำงาน ไม่ให้รันบรรทัดล่างต่อ
+            -- 1. ห้าม Blacklist
+            if isBlacklistedCrate then
+                StateManager:SetStatus("🚫 This crate is blacklisted!", THEME.Fail, self.StatusLabel)
+                return
+            end
+            
+            -- 2. ห้ามที่มีอยู่ในกระเป๋า
+            if isOwned then
+                StateManager:SetStatus("🚫 This crate exists in your inventory!", Color3.fromRGB(255, 85, 85), self.StatusLabel)
+                return
             end
 
-            -- 2. (แถม) เช็ครายชื่อกล่องต้องห้าม (Blacklist) ถ้ามีกล่องไหนห้ามกดเสกเด็ดขาด
-            local BlacklistedCrates = {"Starter Crate", "Untradable Box"} -- ใส่ชื่อกล่องที่ห้ามยุ่ง
-            if table.find(BlacklistedCrates, crate.Name) then
-                 StateManager:SetStatus("🚫 กล่องนี้ห้าม Dupe!", THEME.Fail, self.StatusLabel)
-                 return
-            end
-
-            -- [[ จบจุดแก้ไข ]] --
-
+            -- ✅ ผ่านเงื่อนไขแล้ว ดำเนินการต่อ
             if StateManager.selectedCrates[crate.Name] then
-                -- Logic เอาออก (เหมือนเดิม)
+                -- Logic เอาออก
                 local oldAmount = StateManager.selectedCrates[crate.Name]
                 StateManager:ToggleCrateSelection(crate.Name, nil)
                 
-                stroke.Color = isNotSpawnable and Color3.fromRGB(255, 85, 85) or Color3.fromRGB(55, 55, 60)
+                stroke.Color = Color3.fromRGB(55, 55, 60)
                 NameLbl.Text = crate.Name
-                NameLbl.TextColor3 = isNotSpawnable and Color3.fromRGB(255, 150, 150) or Color3.fromRGB(200, 200, 200)
+                NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
                 
-                TradeManager.SendTradeSignal("Remove", { Name = crate.Name, Service = "CratesService", Category = "Crates" }, oldAmount, self.StatusLabel)
+                TradeManager.SendTradeSignal("Remove", { 
+                    Name = crate.Name, 
+                    Service = "CratesService", 
+                    Category = "Crates" 
+                }, oldAmount, self.StatusLabel)
             else
-                -- Logic เลือกเพิ่ม (เหมือนเดิม)
+                -- Logic เลือกเพิ่ม
                 self:ShowQuantityPopup({Default = 1000, Max = 9999}, function(qty)
                     StateManager:ToggleCrateSelection(crate.Name, qty)
                     
@@ -1309,12 +1313,10 @@ function GUI:RenderCrateGrid()
                     NameLbl.Text = crate.Name .. "\n[x" .. qty .. "]"
                     NameLbl.TextColor3 = THEME.CrateSelected
                     
-                    -- เพิ่ม IsDupe = true เข้าไปในปีกกา
                     TradeManager.SendTradeSignal("Add", { 
                         Name = crate.Name, 
                         Service = "CratesService", 
-                        Category = "Crates",
-                        IsDupe = true  -- <--- ตัวสำคัญที่ต้องเพิ่ม
+                        Category = "Crates" 
                     }, qty, self.StatusLabel)
                 end)
             end
