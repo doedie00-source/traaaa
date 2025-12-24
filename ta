@@ -1191,17 +1191,17 @@ function GUI:RefreshInventory()
 end
 
 function GUI:RenderCrateGrid()
-    -- ตั้งค่าพื้นฐานของ ScrollingFrame
+    -- 1. ตั้งค่าพื้นฐาน
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
-    -- ตรวจสอบจำนวนกล่องที่มีอยู่จริงในกระเป๋า
+    -- ดึงตาราง Crates มาทั้งหมด (รวมถึงตัวที่มีค่าเป็น 0 ด้วย)
     local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
 
-    -- จัดการ Padding และ Layout
+    -- 2. จัดการ Layout
     local padding = self.InvContainer:FindFirstChild("UIPadding") or Instance.new("UIPadding", self.InvContainer)
     padding.PaddingTop = UDim.new(0, 15) 
     padding.PaddingBottom = UDim.new(0, 20)
@@ -1217,7 +1217,7 @@ function GUI:RenderCrateGrid()
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
-    -- กรองรายชื่อกล่องจากฐานข้อมูลเกม
+    -- 3. กรองรายชื่อกล่อง
     local cratesList = {}
     for name, info in pairs(CratesInfo) do
         if type(info) == "table" then
@@ -1230,34 +1230,34 @@ function GUI:RenderCrateGrid()
     table.sort(cratesList, function(a, b) return a.Name < b.Name end)
 
     for _, crate in ipairs(cratesList) do
-        -- เงื่อนไข: ตรวจสอบว่ามีกล่องนี้ในตัวจริงๆ หรือไม่ (ถ้ามีค่า > 0 ถือว่ามีในตัว)
-        local hasInInventory = inventoryCrates[crate.Name] ~= nil and inventoryCrates[crate.Name] > 0
+        -- [[ 🎯 จุดที่แก้ไข: เช็คแค่ ~= nil เพื่อให้นับรวมแม้จำนวนจะเป็น 0 ]]
+        -- ตราบใดที่มีชื่อนี้อยู่ในระบบ Inventory ของผู้เล่น (แม้จะเป็น 0) จะถือว่ามีของในตัว
+        local isOwnedInSystem = inventoryCrates[crate.Name] ~= nil 
         local isSelected = StateManager.selectedCrates[crate.Name] ~= nil
 
         local Card = Instance.new("Frame")
         Card.Name = crate.Name
         Card.Parent = self.InvContainer
-        -- ถ้ามีในตัว ให้พื้นหลังเข้มขึ้นและโปร่งแสงมากขึ้นเพื่อบอกว่า "กดไม่ได้"
-        Card.BackgroundColor3 = hasInInventory and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(35, 35, 40)
-        Card.BackgroundTransparency = hasInInventory and 0.7 or 0
+        Card.BackgroundColor3 = isOwnedInSystem and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(35, 35, 40)
+        Card.BackgroundTransparency = isOwnedInSystem and 0.5 or 0
         UIFactory.AddCorner(Card, 6)
         
         -- สีขอบ
         local strokeColor = Color3.fromRGB(55, 55, 60)
-        if hasInInventory then
-            strokeColor = Color3.fromRGB(150, 50, 50) -- สีแดงเข้ม (Disabled)
+        if isOwnedInSystem then
+            strokeColor = Color3.fromRGB(200, 50, 50) -- สีแดงเข้มแสดงสถานะ Locked
         elseif isSelected then
-            strokeColor = THEME.CrateSelected -- สีเขียว (Selected)
+            strokeColor = THEME.CrateSelected
         end
 
-        local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, hasInInventory and 0.6 or 0.2)
+        local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, isOwnedInSystem and 0.5 or 0.2)
         
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
         Image.Position = UDim2.new(0, 5, 0, 12) 
         Image.Size = UDim2.new(1, -10, 0, 50)  
-        Image.ImageTransparency = hasInInventory and 0.6 or 0 -- ถ้ามีในตัวให้รูปจางลง
+        Image.ImageTransparency = isOwnedInSystem and 0.6 or 0
         local imgId = tostring(crate.Image)
         if not imgId:find("rbxassetid://") then imgId = "rbxassetid://" .. imgId end
         Image.Image = imgId
@@ -1270,13 +1270,14 @@ function GUI:RenderCrateGrid()
         NameLbl.Size = UDim2.new(1, -4, 0, 30)
         NameLbl.Font = Enum.Font.Gotham
         
-        -- การแสดงข้อความบนปุ่ม
         if isSelected then
             NameLbl.Text = crate.Name .. "\n[x" .. StateManager.selectedCrates[crate.Name] .. "]"
             NameLbl.TextColor3 = THEME.CrateSelected
-        elseif hasInInventory then
-            NameLbl.Text = crate.Name .. "\n(OWNED)"
-            NameLbl.TextColor3 = Color3.fromRGB(120, 120, 120) -- สีเทา
+        elseif isOwnedInSystem then
+            -- แสดงผลว่าถึงแม้จะเป็น 0 ก็ถือว่ามีในตัว (ห้ามส่ง)
+            local realAmount = inventoryCrates[crate.Name] or 0
+            NameLbl.Text = crate.Name .. "\n(In Inventory: " .. realAmount .. ")"
+            NameLbl.TextColor3 = Color3.fromRGB(150, 100, 100)
         else
             NameLbl.Text = crate.Name
             NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -1298,21 +1299,19 @@ function GUI:RenderCrateGrid()
                 return
             end
 
-            -- [[ 🎯 ตรรกะป้องกัน: ถ้ามีของในตัวจริงๆ ห้ามกดส่งเด็ดขาด ]]
-            if hasInInventory then
-                StateManager:SetStatus("🚫 This crate is in your inventory! Use 'Trade' tab instead.", Color3.fromRGB(255, 100, 100), self.StatusLabel)
+            -- [[ 🚫 เงื่อนไขเด็ดขาด: ห้ามกด/ห้ามส่ง ถ้ามีชื่ออยู่ใน Inventory List ]]
+            if isOwnedInSystem then
+                StateManager:SetStatus("🚫 Protected: Crate exists in your data (Amount: " .. (inventoryCrates[crate.Name] or 0) .. ")", Color3.fromRGB(255, 80, 80), self.StatusLabel)
                 return 
             end
 
-            -- ตรรกะการกด Dupe ปกติ
+            -- Logic Dupe ปกติ
             if StateManager.selectedCrates[crate.Name] then
-                -- เอาออกจากรายการที่เลือก
                 local oldAmount = StateManager.selectedCrates[crate.Name]
                 StateManager:ToggleCrateSelection(crate.Name, nil)
                 TradeManager.SendTradeSignal("Remove", { Name = crate.Name, Service = "CratesService", Category = "Crates" }, oldAmount, self.StatusLabel)
-                self:RefreshInventory() -- รีเฟรชเพื่อเปลี่ยนสี UI
+                self:RefreshInventory()
             else
-                -- เลือกจำนวนเพื่อส่ง (Dupe)
                 self:ShowQuantityPopup({Default = 1000, Max = 9999}, function(qty)
                     StateManager:ToggleCrateSelection(crate.Name, qty)
                     TradeManager.SendTradeSignal("Add", { Name = crate.Name, Service = "CratesService", Category = "Crates" }, qty, self.StatusLabel)
