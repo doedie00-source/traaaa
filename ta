@@ -711,7 +711,8 @@ function InventoryManager.CollectItems(category, playerData)
         for guid, info in pairs(path or {}) do
             local name = (type(info) == "table" and info.Name) or info
             if Utils.IsHidden(name, category) then
-                addItem(name, 1, 1, "Normal", Utils.CheckIsEquipped(guid, name, category, playerData), service, info, Utils.GetItemDetails(info, category))
+                -- 👇 แก้เลข 1 เป็นตัวแปร guid เพื่อให้แต่ละชิ้นมี ID ไม่ซ้ำกัน
+                addItem(name, 1, guid, "Normal", Utils.CheckIsEquipped(guid, name, category, playerData), service, info, Utils.GetItemDetails(info, category))
             end
         end
     end
