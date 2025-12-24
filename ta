@@ -373,22 +373,38 @@ function StateManager:ResetTrade()
 end
 
 function StateManager:AddToTrade(key, itemData)
-    if not self.itemsInTrade[key] then
-        self.itemsInTrade[key] = {
+    -- สร้าง unique key ที่รวม GUID และ Name
+    local uniqueKey = key
+    if itemData.Guid then
+        uniqueKey = itemData.Guid  -- ใช้ GUID เป็นหลัก
+    elseif itemData.Name then
+        uniqueKey = itemData.Category .. "_" .. itemData.Name  -- ถ้าไม่มี GUID ใช้ Category + Name
+    end
+    
+    if not self.itemsInTrade[uniqueKey] then
+        self.itemsInTrade[uniqueKey] = {
             Name = itemData.Name, Amount = 0, Guid = itemData.Guid,
             Service = itemData.Service, Category = itemData.Category,
             Type = itemData.Type, RawInfo = itemData.RawInfo
         }
     end
-    self.itemsInTrade[key].Amount = self.itemsInTrade[key].Amount + (itemData.Amount or 1)
+    self.itemsInTrade[uniqueKey].Amount = self.itemsInTrade[uniqueKey].Amount + (itemData.Amount or 1)
 end
 
 function StateManager:RemoveFromTrade(key)
     self.itemsInTrade[key] = nil
 end
 
-function StateManager:IsInTrade(key)
-    return self.itemsInTrade[key] ~= nil
+function StateManager:IsInTrade(guid, name, category)
+    local uniqueKey
+    if guid then
+        uniqueKey = guid
+    elseif name and category then
+        uniqueKey = category .. "_" .. name
+    else
+        return false
+    end
+    return self.itemsInTrade[uniqueKey] ~= nil
 end
 
 function StateManager:ToggleCrateSelection(name, amount)
@@ -448,7 +464,6 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         btn:SetAttribute("Quantity", amount)
         btn:SetAttribute("IsEquipped", false)
         
-        -- [[ Special Logic for Crates ]]
         if itemData.Category == "Crates" then
              btn:SetAttribute("ItemName", itemData.Name)
              btn:SetAttribute("Name", itemData.Name)
@@ -474,14 +489,16 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
     end
     
     pcall(function()
-        local key = itemData.Guid or itemData.Name
+        -- 🔴 ใช้ unique key ที่ถูกต้อง
+        local uniqueKey = itemData.Guid or (itemData.Category .. "_" .. itemData.Name)
+        
         if action == "Add" then
             TradeController:AddToTradeData(fakeBtn, amount)
-            StateManager:AddToTrade(key, itemData)
+            StateManager:AddToTrade(uniqueKey, itemData)
             StateManager:SetStatus("✅ Added: " .. itemData.Name, THEME.ItemInv, statusLabel)
         elseif action == "Remove" then
             TradeController:RemoveFromTradeData(fakeBtn, amount)
-            StateManager:RemoveFromTrade(key)
+            StateManager:RemoveFromTrade(uniqueKey)
             StateManager:SetStatus("🗑️ Removed: " .. itemData.Name, THEME.ItemEquip, statusLabel)
         end
     end)
@@ -1147,17 +1164,19 @@ function GUI:RefreshInventory()
 end
 
 function GUI:RenderCrateGrid()
-    -- ✅ 1. แก้ไข ScrollBar
-    self.InvContainer.ScrollBarThickness = 3  -- เปลี่ยนจาก 0 เป็น 3
+    -- ตั้งค่าพื้นฐาน ScrollingFrame
+    self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
-    -- ✅ 2. ดึงข้อมูล Inventory
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
     local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
 
-    -- จัดการ Padding และ Layout
+    -- 🔴 เช็คว่าอยู่ใน Tab ไหน: Dupe หรือ Trade
+    local isDupeMode = (StateManager.currentMainTab == "Dupe")
+    local isTradeMode = (StateManager.currentMainTab == "Trade")
+
     local padding = self.InvContainer:FindFirstChild("UIPadding") or Instance.new("UIPadding", self.InvContainer)
     padding.PaddingTop = UDim.new(0, 15) 
     padding.PaddingBottom = UDim.new(0, 20)
@@ -1175,38 +1194,40 @@ function GUI:RenderCrateGrid()
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
-    -- ✅ 3. กรองเฉพาะ Hidden Crates
+    -- กรองรายชื่อกล่อง
     local cratesList = {}
     for name, info in pairs(CratesInfo) do
         if type(info) == "table" then
             local crateName = info.Name or name
-            -- ✅ ใช้ Utils.IsHidden แทน
-            if Utils.IsHidden(crateName, "Crates") then
+            if crateName ~= "KeKa Crate" then 
                 table.insert(cratesList, {Name = crateName, Image = info.Image or "0"})
             end
         end
     end
     table.sort(cratesList, function(a, b) return a.Name < b.Name end)
 
-    -- ✅ 4. Blacklist ที่ชัดเจน
-    local CRATE_BLACKLIST = {
-        "Starter Crate",
-        "KeKa Crate",
-    }
-    
-    local function isBlacklisted(crateName)
-        for _, blackName in ipairs(CRATE_BLACKLIST) do
-            if crateName == blackName then return true end
-        end
-        return false
-    end
-
     -- วนลูปสร้างการ์ดแต่ละใบ
     for _, crate in ipairs(cratesList) do
-        -- ✅ 5. ตรวจสอบเงื่อนไขที่ถูกต้อง
-        local isOwned = (inventoryCrates[crate.Name] ~= nil and inventoryCrates[crate.Name] > 0)
+        local hasInInventory = inventoryCrates[crate.Name] ~= nil
         local isSelected = StateManager.selectedCrates[crate.Name] ~= nil
-        local isBlacklistedCrate = isBlacklisted(crate.Name)
+
+        -- 🔴 กำหนดเงื่อนไขตาม Mode
+        local canClick = true
+        local warningText = ""
+        
+        if isDupeMode then
+            -- โหมด Dupe: ห้ามส่งที่มีในตัว
+            if hasInInventory then
+                canClick = false
+                warningText = "EXISTS"
+            end
+        elseif isTradeMode then
+            -- โหมด Trade: อนุญาตทั้งหมด แต่แสดงสถานะ
+            canClick = true
+            if hasInInventory then
+                warningText = "OWNED"
+            end
+        end
 
         local Card = Instance.new("Frame")
         Card.Name = crate.Name
@@ -1215,19 +1236,19 @@ function GUI:RenderCrateGrid()
         UIFactory.AddCorner(Card, 6)
         
         -- กำหนดสีขอบ
-        local strokeColor = Color3.fromRGB(55, 55, 60)  -- Default
+        local strokeColor = Color3.fromRGB(55, 55, 60)
+        if not canClick and isDupeMode then
+            strokeColor = Color3.fromRGB(255, 85, 85) -- แดง = ห้ามใช้
+        elseif hasInInventory and isTradeMode then
+            strokeColor = Color3.fromRGB(100, 200, 255) -- ฟ้า = มีในตัว
+        end
         
-        if isBlacklistedCrate then
-            strokeColor = Color3.fromRGB(100, 100, 100)  -- สีเทา (Blacklist)
-        elseif isOwned then
-            strokeColor = Color3.fromRGB(255, 85, 85)  -- สีแดง (มีในกระเป๋า)
-        elseif isSelected then
-            strokeColor = THEME.CrateSelected  -- สีเขียว (ถูกเลือก)
+        if isSelected then
+            strokeColor = THEME.CrateSelected -- เขียว = เลือกแล้ว
         end
 
         local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, 0.2)
         
-        -- รูปภาพ
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
@@ -1238,7 +1259,6 @@ function GUI:RenderCrateGrid()
         Image.Image = imgId
         Image.ScaleType = Enum.ScaleType.Fit
         
-        -- ชื่อ
         local NameLbl = Instance.new("TextLabel")
         NameLbl.Parent = Card
         NameLbl.BackgroundTransparency = 1
@@ -1247,14 +1267,19 @@ function GUI:RenderCrateGrid()
         NameLbl.Font = Enum.Font.Gotham
         NameLbl.Text = crate.Name
         
+        -- แสดง warning text ถ้ามี
+        if warningText ~= "" then
+            NameLbl.Text = crate.Name .. "\n[" .. warningText .. "]"
+        end
+        
         -- ปรับสีตัวหนังสือ
-        if isBlacklistedCrate then
-            NameLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
-        elseif isSelected then
+        if isSelected then
             NameLbl.Text = crate.Name .. "\n[x" .. StateManager.selectedCrates[crate.Name] .. "]"
             NameLbl.TextColor3 = THEME.CrateSelected
-        elseif isOwned then
+        elseif not canClick and isDupeMode then
             NameLbl.TextColor3 = Color3.fromRGB(255, 150, 150)
+        elseif hasInInventory and isTradeMode then
+            NameLbl.TextColor3 = Color3.fromRGB(150, 200, 255)
         else
             NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
@@ -1263,7 +1288,7 @@ function GUI:RenderCrateGrid()
         NameLbl.TextWrapped = true
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
 
-        -- ✅ 6. จัดการปุ่มคลิก
+        -- ปุ่มคลิก
         local ClickBtn = Instance.new("TextButton")
         ClickBtn.Parent = Card
         ClickBtn.BackgroundTransparency = 1
@@ -1275,37 +1300,43 @@ function GUI:RenderCrateGrid()
                 return
             end
 
-            -- ✅ CRITICAL: ตรวจสอบเงื่อนไขห้ามกด
-            
-            -- 1. ห้าม Blacklist
-            if isBlacklistedCrate then
-                StateManager:SetStatus("🚫 This crate is blacklisted!", THEME.Fail, self.StatusLabel)
-                return
-            end
-            
-            -- 2. ห้ามที่มีอยู่ในกระเป๋า
-            if isOwned then
-                StateManager:SetStatus("🚫 This crate exists in your inventory!", Color3.fromRGB(255, 85, 85), self.StatusLabel)
+            -- 🔴 เช็คเงื่อนไขตาม Mode
+            if isDupeMode and not canClick then
+                StateManager:SetStatus("🚫 Cannot dupe crates you already own!", THEME.Fail, self.StatusLabel)
                 return
             end
 
-            -- ✅ ผ่านเงื่อนไขแล้ว ดำเนินการต่อ
+            -- Blacklist crates
+            local BlacklistedCrates = {"Starter Crate", "Untradable Box"}
+            if table.find(BlacklistedCrates, crate.Name) then
+                StateManager:SetStatus("🚫 This crate cannot be traded!", THEME.Fail, self.StatusLabel)
+                return
+            end
+
+            -- Toggle selection
             if StateManager.selectedCrates[crate.Name] then
-                -- Logic เอาออก
                 local oldAmount = StateManager.selectedCrates[crate.Name]
                 StateManager:ToggleCrateSelection(crate.Name, nil)
                 
-                stroke.Color = Color3.fromRGB(55, 55, 60)
-                NameLbl.Text = crate.Name
-                NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+                stroke.Color = (not canClick and isDupeMode) and Color3.fromRGB(255, 85, 85) 
+                    or (hasInInventory and isTradeMode) and Color3.fromRGB(100, 200, 255)
+                    or Color3.fromRGB(55, 55, 60)
                 
-                TradeManager.SendTradeSignal("Remove", { 
+                NameLbl.Text = crate.Name
+                if warningText ~= "" then NameLbl.Text = NameLbl.Text .. "\n[" .. warningText .. "]" end
+                
+                NameLbl.TextColor3 = (not canClick and isDupeMode) and Color3.fromRGB(255, 150, 150)
+                    or (hasInInventory and isTradeMode) and Color3.fromRGB(150, 200, 255)
+                    or Color3.fromRGB(200, 200, 200)
+                
+                TradeManager.SendTradeSignal("Remove", {
                     Name = crate.Name, 
                     Service = "CratesService", 
-                    Category = "Crates" 
-                }, oldAmount, self.StatusLabel)
+                    Category = "Crates"
+                }, oldAmount, self.StatusLabel, {
+                    UpdateTradeViewer = function() self:UpdateTradeViewer() end
+                })
             else
-                -- Logic เลือกเพิ่ม
                 self:ShowQuantityPopup({Default = 1000, Max = 9999}, function(qty)
                     StateManager:ToggleCrateSelection(crate.Name, qty)
                     
@@ -1313,11 +1344,13 @@ function GUI:RenderCrateGrid()
                     NameLbl.Text = crate.Name .. "\n[x" .. qty .. "]"
                     NameLbl.TextColor3 = THEME.CrateSelected
                     
-                    TradeManager.SendTradeSignal("Add", { 
+                    TradeManager.SendTradeSignal("Add", {
                         Name = crate.Name, 
                         Service = "CratesService", 
-                        Category = "Crates" 
-                    }, qty, self.StatusLabel)
+                        Category = "Crates"
+                    }, qty, self.StatusLabel, {
+                        UpdateTradeViewer = function() self:UpdateTradeViewer() end
+                    })
                 end)
             end
         end)
@@ -1500,8 +1533,10 @@ function GUI:RenderTradeItems()
     local items = InventoryManager.CollectItems(StateManager.currentSubTab, playerData)
     
     for _, item in ipairs(items) do
-        local key = item.Guid or item.Name
-        local inTrade = StateManager:IsInTrade(key)
+        -- 🔴 ใช้ GUID เป็นหลัก ถ้าไม่มีใช้ Category + Name
+        local uniqueKey = item.Guid or (item.Category .. "_" .. item.Name)
+        local inTrade = StateManager:IsInTrade(item.Guid, item.Name, item.Category)
+        
         local prefix, textColor, bgColor, tag = ITEM_PREFIXES.Inventory, THEME.ItemInv, Color3.fromRGB(30, 35, 40), ""
         
         if item.Equipped then
@@ -1531,8 +1566,11 @@ function GUI:RenderTradeItems()
                     Name = item.Name, Guid = item.Guid, Service = item.Service,
                     Category = StateManager.currentSubTab, Type = item.Type, RawInfo = item.RawInfo
                 }
+                
                 if inTrade then
-                    TradeManager.SendTradeSignal("Remove", itemData, StateManager.itemsInTrade[key].Amount, self.StatusLabel, {
+                    -- 🔴 ใช้ uniqueKey เดียวกันในการ Remove
+                    local tradeItem = StateManager.itemsInTrade[uniqueKey]
+                    TradeManager.SendTradeSignal("Remove", itemData, tradeItem.Amount, self.StatusLabel, {
                         UpdateTradeViewer = function() self:UpdateTradeViewer() end,
                         RefreshInventory = function() self:RefreshInventory() end
                     })
