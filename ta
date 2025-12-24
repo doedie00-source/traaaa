@@ -1,6 +1,13 @@
--- [[ 🎯 Universal Trade System V6.5 - Fixed by AI ]] --
--- Fixed: Accessory/Pet selection bug (Unique GUIDs)
--- Fixed: Crates Logic (Separated Trade vs Dupe behavior)
+-- [[ 🎯 Universal Trade System V6.5 - Crate Dupe (Fixed) ]] --
+-- Added: Crates Tab with Grid Layout (Centered & No Scrollbar)
+-- Fixed: Scrollbar Visibility & Alignment
+-- Fixed: Variable Scope Errors
+-- 2338
+-- วิธีใช้งาน cratesdupe
+-- 1 ใช้ตัวรับcrates ส่งเทรดไปหา ตัวdupe
+-- 2 ตัวdupe add crates 
+-- 3 ตัวdupe cancel trade โดยการกด e openegg
+-- 4 ใช้ตัวรับส่งหา ตัว dupe ละเทรดเปล่าๆอีกที
 -- ========================================== --
 -- 📦 Services & Dependencies
 -- ========================================== --
@@ -34,21 +41,25 @@ end
 -- ⚙️ Configuration & Constants
 -- ========================================== --
 local CONFIG = {
-    VERSION = "6.5 (Fixed)",
+    VERSION = "6.5",
     GUI_NAME = "CleanTradeGUI",
     
+    -- Window Settings
     MAIN_WINDOW_SIZE = UDim2.new(0, 800, 0, 500),
     SIDEBAR_WIDTH = 120,
     MINI_ICON_SIZE = UDim2.new(0, 50, 0, 50),
     
+    -- Timing
     STATUS_RESET_DELAY = 4,
     BUTTON_CHECK_INTERVAL = 0.5,
     TRADE_RESET_THRESHOLD = 3,
     
+    -- UI Spacing
     CORNER_RADIUS = 8,
     LIST_PADDING = 3,
     BUTTON_PADDING = 5,
     
+    -- Keybind
     TOGGLE_KEY = Enum.KeyCode.T,
 }
 
@@ -74,13 +85,19 @@ local THEME = {
     Success = Color3.fromRGB(85, 255, 127),
     Fail = Color3.fromRGB(255, 85, 85),
     DupeReady = Color3.fromRGB(0, 255, 200),
-    CrateSelected = Color3.fromRGB(0, 255, 100),
+    CrateSelected = Color3.fromRGB(0, 255, 100), -- Green border for crates
 }
 
--- Dupe Recipes
+-- ข้อมูลสูตรการเสกของ (Dupe Recipes)
 local DUPE_RECIPES = {
     Scrolls = {
-        {Name = "Dark Scroll", Tier = 5, RequiredTiers = {3, 4, 6}, Service = "Scrolls", PreventIfOwned = true}
+        {
+            Name = "Dark Scroll", 
+            Tier = 5, 
+            RequiredTiers = {3, 4, 6}, 
+            Service = "Scrolls",
+            PreventIfOwned = true
+        }
     },
     Tickets = {
         {Name = "Void Ticket", Tier = 3, RequiredTiers = {4, 5, 6}, Service = "Tickets"},
@@ -94,7 +111,7 @@ local DUPE_RECIPES = {
         {Name = "Mega Wins Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Wins Potion"},
         {Name = "Mega Exp Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Exp Potion"},
     },
-    Crates = {}
+    Crates = {} -- Placeholder, will be populated dynamically
 }
 
 local HIDDEN_ITEMS = {
@@ -120,6 +137,7 @@ local Utils = {}
 function Utils.IsTradeActive()
     local Windows = LocalPlayer.PlayerGui:FindFirstChild("Windows")
     if not Windows then return false end
+    
     local activeWindows = {"TradingFrame", "AreYouSure", "AreYouSureSecret", "AmountSelector"}
     for _, winName in ipairs(activeWindows) do
         local frame = Windows:FindFirstChild(winName)
@@ -278,6 +296,7 @@ function UIFactory.CreateScrollingFrame(props)
         layout.Padding = UDim.new(0, props.Padding or CONFIG.LIST_PADDING)
         layout.HorizontalAlignment = props.HAlign or Enum.HorizontalAlignment.Center
     end
+    
     return scroll
 end
 
@@ -417,26 +436,47 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         return
     end
     
+    -- ตรวจสอบว่าเป็นการเรียกจากหน้า Dupe หรือหน้า Trade ปกติ
+    local isDupeMode = (StateManager.currentMainTab == "Dupe")
+    
     local success, fakeBtn = pcall(function()
         local btn = Instance.new("ImageButton")
-        btn.Name = "TradeItem_" .. itemData.Name .. "_" .. tick()
+        -- ใช้ GUID หรือชื่อ + Timestamp เพื่อให้ชื่อปุ่มไม่ซ้ำกันเด็ดขาด (แก้ปัญหา InTrade ยกแผง)
+        local uniqueId = itemData.Guid or (itemData.Name .. "_" .. tick())
+        btn.Name = "TradeItem_" .. uniqueId
         btn.Visible = false
         btn.Size = UDim2.new(0, 100, 0, 100)
         btn.BackgroundTransparency = 1
         
+        -- [[ 1. Basic Attributes ]]
         btn:SetAttribute("Service", itemData.Service)
         btn:SetAttribute("Index", itemData.Name) 
         btn:SetAttribute("Quantity", amount)
         btn:SetAttribute("IsEquipped", false)
         
+        -- [[ 2. Special Logic for Crates (แยกประเภท Dupe กับ Real) ]]
         if itemData.Category == "Crates" then
              btn:SetAttribute("ItemName", itemData.Name)
              btn:SetAttribute("Name", itemData.Name)
              btn:SetAttribute("Amount", amount)
              btn:SetAttribute("Service", "CratesService")
+             
+             -- ถ้าเป็นโหมด Dupe (เสกกล่องที่ไม่มีในตัว) ให้เพิ่ม Tag พิเศษ
+             -- เพื่อให้ระบบจำลอง (Fake) ทำงานแยกจากระบบ Hidden Trade
+             if isDupeMode then
+                 btn:SetAttribute("IsFakeDupe", true)
+             else
+                 btn:SetAttribute("IsHiddenTrade", true)
+             end
         end
 
-        if itemData.Guid then btn:SetAttribute("Guid", tostring(itemData.Guid)) end
+        -- [[ 3. Handling GUID (สำหรับ Accessory/Pets) ]]
+        -- สำคัญมาก: ถ้าเป็นไอเทมจริงต้องมี GUID เพื่อให้ระบบระบุตัวชิ้นนั้นๆ ได้
+        if itemData.Guid then 
+            btn:SetAttribute("Guid", tostring(itemData.Guid)) 
+        end
+
+        -- [[ 4. Extra Info ]]
         if itemData.RawInfo then
             if itemData.RawInfo.Evolution then btn:SetAttribute("Evolution", itemData.RawInfo.Evolution) end
             if itemData.RawInfo.Shiny then btn:SetAttribute("Shiny", true) end
@@ -453,12 +493,17 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         return
     end
     
+    -- [[ 5. Execute Action ]]
     pcall(function()
+        -- ใช้ GUID เป็น Key ถ้าไม่มี (กรณีกล่อง) ให้ใช้ชื่อไอเทมแทน
         local key = itemData.Guid or itemData.Name
+        
         if action == "Add" then
             TradeController:AddToTradeData(fakeBtn, amount)
             StateManager:AddToTrade(key, itemData)
-            StateManager:SetStatus("✅ Added: " .. itemData.Name, THEME.ItemInv, statusLabel)
+            
+            local modePrefix = isDupeMode and "✨ Dupe: " or "✅ Added: "
+            StateManager:SetStatus(modePrefix .. itemData.Name, THEME.ItemInv, statusLabel)
         elseif action == "Remove" then
             TradeController:RemoveFromTradeData(fakeBtn, amount)
             StateManager:RemoveFromTrade(key)
@@ -466,8 +511,14 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         end
     end)
     
-    task.delay(0.5, function() if fakeBtn and fakeBtn.Parent then fakeBtn:Destroy() end end)
+    -- ทำลายปุ่มจำลองทิ้งหลังจากส่งสัญญาณเสร็จ
+    task.delay(0.5, function() 
+        if fakeBtn and fakeBtn.Parent then 
+            fakeBtn:Destroy() 
+        end 
+    end)
     
+    -- รัน Callback เพื่ออัปเดต UI หน้าจอของเรา
     if callbacks then
         if callbacks.UpdateTradeViewer then callbacks.UpdateTradeViewer() end
         if callbacks.RefreshInventory then callbacks.RefreshInventory() end
@@ -640,16 +691,17 @@ function InventoryManager.CollectItems(category, playerData)
     local items = {}
     local function addItem(name, amount, guid, typeStr, equipped, service, rawInfo, details)
         table.insert(items, {
-            Name = name, Amount = amount, Guid = guid,
+            Name = name, Amount = amount, Guid = guid, -- ใช้ guid ที่ส่งมาแทนเลข 1
             Type = typeStr, Equipped = equipped, Service = service,
             RawInfo = rawInfo, Details = details
         })
     end
     
     if category == "Crates" then
+        -- สำหรับ Crates ในหน้า Trade ให้ดึงเฉพาะที่มีในตัวจริงๆ (Hidden Trade)
         for name, amount in pairs(playerData.CratesService.Crates or {}) do
-            if Utils.IsHidden(name, "Crates") and amount > 0 then
-                addItem(name, amount, nil, "Crate", false, "CratesService", nil, "")
+            if amount > 0 then -- ตรวจสอบว่ามีของจริงไหม
+                addItem(name, amount, name, "Crate", false, "CratesService", nil, "")
             end
         end
     elseif category == "Secrets" then
@@ -669,14 +721,22 @@ function InventoryManager.CollectItems(category, playerData)
             end
         end
     else
-        -- [[ 🔴 FIX: Fixed unique GUIDs for Pets/Accessories ]] --
         local path = (category == "Pets" and playerData.PetsService.Pets) or playerData.AccessoryService.Accessories
         local service = (category == "Pets" and "PetsService") or "AccessoryService"
         for guid, info in pairs(path or {}) do
             local name = (type(info) == "table" and info.Name) or info
             if Utils.IsHidden(name, category) then
-                -- Changed '1' to 'guid' here
-                addItem(name, 1, guid, "Normal", Utils.CheckIsEquipped(guid, name, category, playerData), service, info, Utils.GetItemDetails(info, category))
+                -- [[ 🛠️ จุดที่ต้องแก้: เปลี่ยนจากเลข 1 เป็นตัวแปร guid จริงๆ ]]
+                addItem(
+                    name, 
+                    1, 
+                    guid,  -- เดิมเป็นเลข 1 ทำให้ไอเทมทุกชิ้น ID ซ้ำกัน
+                    "Normal", 
+                    Utils.CheckIsEquipped(guid, name, category, playerData), 
+                    service, 
+                    info, 
+                    Utils.GetItemDetails(info, category)
+                )
             end
         end
     end
@@ -1058,6 +1118,7 @@ function GUI:UpdateUIState()
     self:UpdateSubTabs()
     self.DupeWarning.Visible = false
     
+    -- Reset Scroll Layout
     if self.InvContainer:FindFirstChild("UIGridLayout") then
         self.InvContainer:ClearAllChildren()
         local layout = Instance.new("UIListLayout", self.InvContainer)
@@ -1127,18 +1188,18 @@ function GUI:RefreshInventory()
     end
 end
 
--- [[ 🔴 FIX: Fixed Crate Logic (Trade vs Dupe) ]] --
 function GUI:RenderCrateGrid()
+    -- ตั้งค่าพื้นฐานของ ScrollingFrame
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
+    -- ตรวจสอบจำนวนกล่องที่มีอยู่จริงในกระเป๋า
     local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
 
-    local isTradeTab = (StateManager.currentMainTab == "Trade")
-
+    -- จัดการ Padding และ Layout
     local padding = self.InvContainer:FindFirstChild("UIPadding") or Instance.new("UIPadding", self.InvContainer)
     padding.PaddingTop = UDim.new(0, 15) 
     padding.PaddingBottom = UDim.new(0, 20)
@@ -1154,6 +1215,7 @@ function GUI:RenderCrateGrid()
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
+    -- กรองรายชื่อกล่องจากฐานข้อมูลเกม
     local cratesList = {}
     for name, info in pairs(CratesInfo) do
         if type(info) == "table" then
@@ -1166,35 +1228,34 @@ function GUI:RenderCrateGrid()
     table.sort(cratesList, function(a, b) return a.Name < b.Name end)
 
     for _, crate in ipairs(cratesList) do
-        local ownedAmount = inventoryCrates[crate.Name] or 0
-        local isOwned = ownedAmount > 0
+        -- เงื่อนไข: ตรวจสอบว่ามีกล่องนี้ในตัวจริงๆ หรือไม่ (ถ้ามีค่า > 0 ถือว่ามีในตัว)
+        local hasInInventory = inventoryCrates[crate.Name] ~= nil and inventoryCrates[crate.Name] > 0
         local isSelected = StateManager.selectedCrates[crate.Name] ~= nil
-
-        -- Logic: Hide unowned crates in Trade Tab (Hidden Trade Mode)
-        if isTradeTab and not isOwned then 
-            continue 
-        end
 
         local Card = Instance.new("Frame")
         Card.Name = crate.Name
         Card.Parent = self.InvContainer
-        Card.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+        -- ถ้ามีในตัว ให้พื้นหลังเข้มขึ้นและโปร่งแสงมากขึ้นเพื่อบอกว่า "กดไม่ได้"
+        Card.BackgroundColor3 = hasInInventory and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(35, 35, 40)
+        Card.BackgroundTransparency = hasInInventory and 0.7 or 0
         UIFactory.AddCorner(Card, 6)
         
+        -- สีขอบ
         local strokeColor = Color3.fromRGB(55, 55, 60)
-        -- In Dupe mode, warn if owned
-        if not isTradeTab and isOwned then
-            strokeColor = Color3.fromRGB(255, 85, 85)
+        if hasInInventory then
+            strokeColor = Color3.fromRGB(150, 50, 50) -- สีแดงเข้ม (Disabled)
+        elseif isSelected then
+            strokeColor = THEME.CrateSelected -- สีเขียว (Selected)
         end
-        if isSelected then strokeColor = THEME.CrateSelected end
 
-        local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, 0.2)
+        local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, hasInInventory and 0.6 or 0.2)
         
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
         Image.Position = UDim2.new(0, 5, 0, 12) 
         Image.Size = UDim2.new(1, -10, 0, 50)  
+        Image.ImageTransparency = hasInInventory and 0.6 or 0 -- ถ้ามีในตัวให้รูปจางลง
         local imgId = tostring(crate.Image)
         if not imgId:find("rbxassetid://") then imgId = "rbxassetid://" .. imgId end
         Image.Image = imgId
@@ -1206,62 +1267,54 @@ function GUI:RenderCrateGrid()
         NameLbl.Position = UDim2.new(0, 2, 0, 65) 
         NameLbl.Size = UDim2.new(1, -4, 0, 30)
         NameLbl.Font = Enum.Font.Gotham
-        NameLbl.TextSize = 8 
-        NameLbl.TextWrapped = true
-        NameLbl.TextYAlignment = Enum.TextYAlignment.Top
-        NameLbl.Text = crate.Name
-
+        
+        -- การแสดงข้อความบนปุ่ม
         if isSelected then
             NameLbl.Text = crate.Name .. "\n[x" .. StateManager.selectedCrates[crate.Name] .. "]"
             NameLbl.TextColor3 = THEME.CrateSelected
-        elseif not isTradeTab and isOwned then
-            NameLbl.TextColor3 = Color3.fromRGB(255, 150, 150)
+        elseif hasInInventory then
+            NameLbl.Text = crate.Name .. "\n(OWNED)"
+            NameLbl.TextColor3 = Color3.fromRGB(120, 120, 120) -- สีเทา
         else
+            NameLbl.Text = crate.Name
             NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
+        
+        NameLbl.TextSize = 8 
+        NameLbl.TextWrapped = true
+        NameLbl.TextYAlignment = Enum.TextYAlignment.Top
 
         local ClickBtn = Instance.new("TextButton")
         ClickBtn.Parent = Card
         ClickBtn.BackgroundTransparency = 1
         ClickBtn.Size = UDim2.new(1, 0, 1, 0)
         ClickBtn.Text = ""
+
         ClickBtn.MouseButton1Click:Connect(function()
             if not Utils.IsTradeActive() then
                 StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, self.StatusLabel)
                 return
             end
 
-            if isTradeTab then
-                -- Allowed (Hidden Trade Logic)
-            else
-                -- Blocked (Dupe Logic)
-                if isOwned then
-                    StateManager:SetStatus("🚫 Owned! Remove from inv first.", Color3.fromRGB(255, 85, 85), self.StatusLabel)
-                    return
-                end
+            -- [[ 🎯 ตรรกะป้องกัน: ถ้ามีของในตัวจริงๆ ห้ามกดส่งเด็ดขาด ]]
+            if hasInInventory then
+                StateManager:SetStatus("🚫 This crate is in your inventory! Use 'Trade' tab instead.", Color3.fromRGB(255, 100, 100), self.StatusLabel)
+                return 
             end
 
+            -- ตรรกะการกด Dupe ปกติ
             if StateManager.selectedCrates[crate.Name] then
+                -- เอาออกจากรายการที่เลือก
                 local oldAmount = StateManager.selectedCrates[crate.Name]
                 StateManager:ToggleCrateSelection(crate.Name, nil)
-                
-                stroke.Color = (not isTradeTab and isOwned) and Color3.fromRGB(255, 85, 85) or Color3.fromRGB(55, 55, 60)
-                NameLbl.Text = crate.Name
-                NameLbl.TextColor3 = (not isTradeTab and isOwned) and Color3.fromRGB(255, 150, 150) or Color3.fromRGB(200, 200, 200)
-                
                 TradeManager.SendTradeSignal("Remove", { Name = crate.Name, Service = "CratesService", Category = "Crates" }, oldAmount, self.StatusLabel)
+                self:RefreshInventory() -- รีเฟรชเพื่อเปลี่ยนสี UI
             else
-                local defQty = isTradeTab and ownedAmount or 1000
-                local maxQty = isTradeTab and ownedAmount or 9999
-
-                self:ShowQuantityPopup({Default = defQty, Max = maxQty}, function(qty)
+                -- เลือกจำนวนเพื่อส่ง (Dupe)
+                self:ShowQuantityPopup({Default = 1000, Max = 9999}, function(qty)
                     StateManager:ToggleCrateSelection(crate.Name, qty)
-                    
-                    stroke.Color = THEME.CrateSelected
-                    NameLbl.Text = crate.Name .. "\n[x" .. qty .. "]"
-                    NameLbl.TextColor3 = THEME.CrateSelected
-                    
                     TradeManager.SendTradeSignal("Add", { Name = crate.Name, Service = "CratesService", Category = "Crates" }, qty, self.StatusLabel)
+                    self:RefreshInventory()
                 end)
             end
         end)
