@@ -691,16 +691,18 @@ function InventoryManager.CollectItems(category, playerData)
     local items = {}
     local function addItem(name, amount, guid, typeStr, equipped, service, rawInfo, details)
         table.insert(items, {
-            Name = name, Amount = amount, Guid = guid, -- ใช้ guid ที่ส่งมาแทนเลข 1
+            Name = name, Amount = amount, Guid = guid,
             Type = typeStr, Equipped = equipped, Service = service,
             RawInfo = rawInfo, Details = details
         })
     end
     
     if category == "Crates" then
-        -- สำหรับ Crates ในหน้า Trade ให้ดึงเฉพาะที่มีในตัวจริงๆ (Hidden Trade)
+        -- วนลูปเช็คกล่องในตัวละคร
         for name, amount in pairs(playerData.CratesService.Crates or {}) do
-            if amount > 0 then -- ตรวจสอบว่ามีของจริงไหม
+            -- [[ 🎯 จุดที่แก้ไข: กรองเฉพาะกล่องที่อยู่ใน HIDDEN_ITEMS เท่านั้น ]]
+            if Utils.IsHidden(name, "Crates") and amount > 0 then
+                -- ใช้ชื่อกล่องเป็น GUID ไปเลยเพราะกล่องไม่มีรหัสแยกชิ้น
                 addItem(name, amount, name, "Crate", false, "CratesService", nil, "")
             end
         end
