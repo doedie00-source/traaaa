@@ -1191,21 +1191,14 @@ function GUI:RefreshInventory()
 end
 
 function GUI:RenderCrateGrid()
-    -- 1. ตั้งค่าพื้นฐาน
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
-    -- ดึงตาราง Crates มาทั้งหมด (รวมถึงตัวที่มีค่าเป็น 0 ด้วย)
     local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
 
-    -- 2. จัดการ Layout
-    local padding = self.InvContainer:FindFirstChild("UIPadding") or Instance.new("UIPadding", self.InvContainer)
-    padding.PaddingTop = UDim.new(0, 15) 
-    padding.PaddingBottom = UDim.new(0, 20)
-    
     if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
     
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
@@ -1217,47 +1210,54 @@ function GUI:RenderCrateGrid()
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
-    -- 3. กรองรายชื่อกล่อง
+    -- 1. กรองรายชื่อกล่องและเก็บทั้ง "Key ในระบบ" และ "ชื่อที่ใช้แสดง"
     local cratesList = {}
-    for name, info in pairs(CratesInfo) do
+    for internalId, info in pairs(CratesInfo) do
         if type(info) == "table" then
-            local crateName = info.Name or name
-            if crateName ~= "KeKa Crate" then 
-                table.insert(cratesList, {Name = crateName, Image = info.Image or "0"})
+            local displayName = info.Name or internalId
+            if displayName ~= "KeKa Crate" then 
+                table.insert(cratesList, {
+                    DisplayName = displayName, 
+                    InternalID = internalId, -- รหัสอ้างอิงภายใน (เช่น "Bronze")
+                    Image = info.Image or "0"
+                })
             end
         end
     end
-    table.sort(cratesList, function(a, b) return a.Name < b.Name end)
+    table.sort(cratesList, function(a, b) return a.DisplayName < b.DisplayName end)
 
     for _, crate in ipairs(cratesList) do
-        -- [[ 🎯 จุดที่แก้ไข: เช็คแค่ ~= nil เพื่อให้นับรวมแม้จำนวนจะเป็น 0 ]]
-        -- ตราบใดที่มีชื่อนี้อยู่ในระบบ Inventory ของผู้เล่น (แม้จะเป็น 0) จะถือว่ามีของในตัว
-        local isOwnedInSystem = inventoryCrates[crate.Name] ~= nil 
-        local isSelected = StateManager.selectedCrates[crate.Name] ~= nil
+        -- [[ 🎯 จุดแก้ไขสำคัญ: ตรรกะการเช็คว่ามีอยู่ในระบบหรือไม่ (Double Check) ]]
+        -- เช็คทั้งชื่อที่มี "Crate" ต่อท้าย และชื่อดิบๆ จาก ID
+        local amountInInv = inventoryCrates[crate.DisplayName] or inventoryCrates[crate.InternalID]
+        
+        -- ถ้าค่าที่หาได้ไม่ใช่ nil (นับรวม 0) ให้ถือว่าเป็น OWNED
+        local isOwnedInSystem = (amountInInv ~= nil)
+        local isSelected = StateManager.selectedCrates[crate.DisplayName] ~= nil
 
         local Card = Instance.new("Frame")
-        Card.Name = crate.Name
+        Card.Name = crate.DisplayName
         Card.Parent = self.InvContainer
-        Card.BackgroundColor3 = isOwnedInSystem and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(35, 35, 40)
-        Card.BackgroundTransparency = isOwnedInSystem and 0.5 or 0
+        Card.BackgroundColor3 = isOwnedInSystem and Color3.fromRGB(25, 25, 30) or Color3.fromRGB(35, 35, 40)
+        Card.BackgroundTransparency = isOwnedInSystem and 0.4 or 0
         UIFactory.AddCorner(Card, 6)
         
-        -- สีขอบ
+        -- สีขอบ: ถ้า Owned แล้วให้เป็นสีแดง/มืด เพื่อบอกว่าห้ามกด
         local strokeColor = Color3.fromRGB(55, 55, 60)
         if isOwnedInSystem then
-            strokeColor = Color3.fromRGB(200, 50, 50) -- สีแดงเข้มแสดงสถานะ Locked
+            strokeColor = Color3.fromRGB(180, 40, 40) 
         elseif isSelected then
             strokeColor = THEME.CrateSelected
         end
 
-        local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, isOwnedInSystem and 0.5 or 0.2)
+        local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, isOwnedInSystem and 0.4 or 0.2)
         
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
         Image.Position = UDim2.new(0, 5, 0, 12) 
         Image.Size = UDim2.new(1, -10, 0, 50)  
-        Image.ImageTransparency = isOwnedInSystem and 0.6 or 0
+        Image.ImageTransparency = isOwnedInSystem and 0.5 or 0
         local imgId = tostring(crate.Image)
         if not imgId:find("rbxassetid://") then imgId = "rbxassetid://" .. imgId end
         Image.Image = imgId
@@ -1271,15 +1271,14 @@ function GUI:RenderCrateGrid()
         NameLbl.Font = Enum.Font.Gotham
         
         if isSelected then
-            NameLbl.Text = crate.Name .. "\n[x" .. StateManager.selectedCrates[crate.Name] .. "]"
+            NameLbl.Text = crate.DisplayName .. "\n[x" .. StateManager.selectedCrates[crate.DisplayName] .. "]"
             NameLbl.TextColor3 = THEME.CrateSelected
         elseif isOwnedInSystem then
-            -- แสดงผลว่าถึงแม้จะเป็น 0 ก็ถือว่ามีในตัว (ห้ามส่ง)
-            local realAmount = inventoryCrates[crate.Name] or 0
-            NameLbl.Text = crate.Name .. "\n(In Inventory: " .. realAmount .. ")"
-            NameLbl.TextColor3 = Color3.fromRGB(150, 100, 100)
+            -- แสดงผล (OWNED) กำกับเสมอถ้าตรวจพบในข้อมูล
+            NameLbl.Text = crate.DisplayName .. "\n(OWNED)"
+            NameLbl.TextColor3 = Color3.fromRGB(130, 130, 130)
         else
-            NameLbl.Text = crate.Name
+            NameLbl.Text = crate.DisplayName
             NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
         
@@ -1299,22 +1298,21 @@ function GUI:RenderCrateGrid()
                 return
             end
 
-            -- [[ 🚫 เงื่อนไขเด็ดขาด: ห้ามกด/ห้ามส่ง ถ้ามีชื่ออยู่ใน Inventory List ]]
+            -- [[ 🚫 บล็อคการส่งสัญญาณถ้ามีอยู่ในระบบ ]]
             if isOwnedInSystem then
-                StateManager:SetStatus("🚫 Protected: Crate exists in your data (Amount: " .. (inventoryCrates[crate.Name] or 0) .. ")", Color3.fromRGB(255, 80, 80), self.StatusLabel)
+                StateManager:SetStatus("🚫 Locked: This crate exists in your inventory history.", Color3.fromRGB(255, 80, 80), self.StatusLabel)
                 return 
             end
 
-            -- Logic Dupe ปกติ
-            if StateManager.selectedCrates[crate.Name] then
-                local oldAmount = StateManager.selectedCrates[crate.Name]
-                StateManager:ToggleCrateSelection(crate.Name, nil)
-                TradeManager.SendTradeSignal("Remove", { Name = crate.Name, Service = "CratesService", Category = "Crates" }, oldAmount, self.StatusLabel)
+            if StateManager.selectedCrates[crate.DisplayName] then
+                local oldAmount = StateManager.selectedCrates[crate.DisplayName]
+                StateManager:ToggleCrateSelection(crate.DisplayName, nil)
+                TradeManager.SendTradeSignal("Remove", { Name = crate.DisplayName, Service = "CratesService", Category = "Crates" }, oldAmount, self.StatusLabel)
                 self:RefreshInventory()
             else
                 self:ShowQuantityPopup({Default = 1000, Max = 9999}, function(qty)
-                    StateManager:ToggleCrateSelection(crate.Name, qty)
-                    TradeManager.SendTradeSignal("Add", { Name = crate.Name, Service = "CratesService", Category = "Crates" }, qty, self.StatusLabel)
+                    StateManager:ToggleCrateSelection(crate.DisplayName, qty)
+                    TradeManager.SendTradeSignal("Add", { Name = crate.DisplayName, Service = "CratesService", Category = "Crates" }, qty, self.StatusLabel)
                     self:RefreshInventory()
                 end)
             end
