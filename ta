@@ -373,12 +373,19 @@ function StateManager:ResetTrade()
 end
 
 function StateManager:AddToTrade(key, itemData)
+    if not itemData or not itemData.Name then 
+        warn("⚠️ AddToTrade: Invalid itemData")
+        return 
+    end
+    
     -- สร้าง unique key ที่รวม GUID และ Name
     local uniqueKey = key
-    if itemData.Guid then
-        uniqueKey = itemData.Guid  -- ใช้ GUID เป็นหลัก
-    elseif itemData.Name then
+    if itemData.Guid and itemData.Guid ~= "" then
+        uniqueKey = tostring(itemData.Guid)  -- ใช้ GUID เป็นหลัก
+    elseif itemData.Category and itemData.Name then
         uniqueKey = itemData.Category .. "_" .. itemData.Name  -- ถ้าไม่มี GUID ใช้ Category + Name
+    else
+        uniqueKey = "Item_" .. itemData.Name  -- fallback
     end
     
     if not self.itemsInTrade[uniqueKey] then
@@ -396,14 +403,19 @@ function StateManager:RemoveFromTrade(key)
 end
 
 function StateManager:IsInTrade(guid, name, category)
+    if not name then return false end
+    
     local uniqueKey
-    if guid then
-        uniqueKey = guid
+    if guid and guid ~= "" then
+        uniqueKey = tostring(guid)
     elseif name and category then
         uniqueKey = category .. "_" .. name
+    elseif name then
+        uniqueKey = "Item_" .. name
     else
         return false
     end
+    
     return self.itemsInTrade[uniqueKey] ~= nil
 end
 
@@ -452,6 +464,11 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         return
     end
     
+    if not itemData or not itemData.Name then
+        warn("⚠️ SendTradeSignal: Invalid itemData")
+        return
+    end
+    
     local success, fakeBtn = pcall(function()
         local btn = Instance.new("ImageButton")
         btn.Name = "TradeItem_" .. itemData.Name .. "_" .. tick()
@@ -459,20 +476,22 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         btn.Size = UDim2.new(0, 100, 0, 100)
         btn.BackgroundTransparency = 1
         
-        btn:SetAttribute("Service", itemData.Service)
+        btn:SetAttribute("Service", itemData.Service or "Unknown")
         btn:SetAttribute("Index", itemData.Name) 
-        btn:SetAttribute("Quantity", amount)
+        btn:SetAttribute("Quantity", amount or 1)
         btn:SetAttribute("IsEquipped", false)
         
         if itemData.Category == "Crates" then
              btn:SetAttribute("ItemName", itemData.Name)
              btn:SetAttribute("Name", itemData.Name)
-             btn:SetAttribute("Amount", amount)
+             btn:SetAttribute("Amount", amount or 1)
              btn:SetAttribute("Service", "CratesService")
         end
 
-        if itemData.Guid then btn:SetAttribute("Guid", tostring(itemData.Guid)) end
-        if itemData.RawInfo then
+        if itemData.Guid and itemData.Guid ~= "" then 
+            btn:SetAttribute("Guid", tostring(itemData.Guid)) 
+        end
+        if itemData.RawInfo and type(itemData.RawInfo) == "table" then
             if itemData.RawInfo.Evolution then btn:SetAttribute("Evolution", itemData.RawInfo.Evolution) end
             if itemData.RawInfo.Shiny then btn:SetAttribute("Shiny", true) end
             if itemData.RawInfo.Golden then btn:SetAttribute("Golden", true) end
@@ -485,29 +504,44 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
     
     if not success or not fakeBtn then
         StateManager:SetStatus("❌ Failed to create signal!", THEME.ItemEquip, statusLabel)
+        warn("Error creating fakeBtn:", success, fakeBtn)
         return
     end
     
+    local uniqueKey
+    if itemData.Guid and itemData.Guid ~= "" then
+        uniqueKey = tostring(itemData.Guid)
+    elseif itemData.Category and itemData.Name then
+        uniqueKey = itemData.Category .. "_" .. itemData.Name
+    else
+        uniqueKey = "Item_" .. itemData.Name
+    end
+    
     pcall(function()
-        -- 🔴 ใช้ unique key ที่ถูกต้อง
-        local uniqueKey = itemData.Guid or (itemData.Category .. "_" .. itemData.Name)
-        
         if action == "Add" then
-            TradeController:AddToTradeData(fakeBtn, amount)
+            TradeController:AddToTradeData(fakeBtn, amount or 1)
             StateManager:AddToTrade(uniqueKey, itemData)
             StateManager:SetStatus("✅ Added: " .. itemData.Name, THEME.ItemInv, statusLabel)
         elseif action == "Remove" then
-            TradeController:RemoveFromTradeData(fakeBtn, amount)
+            TradeController:RemoveFromTradeData(fakeBtn, amount or 1)
             StateManager:RemoveFromTrade(uniqueKey)
             StateManager:SetStatus("🗑️ Removed: " .. itemData.Name, THEME.ItemEquip, statusLabel)
         end
     end)
     
-    task.delay(0.5, function() if fakeBtn and fakeBtn.Parent then fakeBtn:Destroy() end end)
+    task.delay(0.5, function() 
+        if fakeBtn and fakeBtn.Parent then 
+            pcall(function() fakeBtn:Destroy() end)
+        end 
+    end)
     
     if callbacks then
-        if callbacks.UpdateTradeViewer then callbacks.UpdateTradeViewer() end
-        if callbacks.RefreshInventory then callbacks.RefreshInventory() end
+        if callbacks.UpdateTradeViewer then 
+            pcall(function() callbacks.UpdateTradeViewer() end)
+        end
+        if callbacks.RefreshInventory then 
+            pcall(function() callbacks.RefreshInventory() end)
+        end
     end
 end
 
@@ -1169,9 +1203,14 @@ function GUI:RenderCrateGrid()
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
-    local replica = ReplicaListener:GetReplica()
-    local playerData = replica and replica.Data
-    local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
+    local success, result = pcall(function()
+        local replica = ReplicaListener:GetReplica()
+        local playerData = replica and replica.Data
+        local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
+        return inventoryCrates
+    end)
+    
+    local inventoryCrates = (success and result) or {}
 
     -- 🔴 เช็คว่าอยู่ใน Tab ไหน: Dupe หรือ Trade
     local isDupeMode = (StateManager.currentMainTab == "Dupe")
@@ -1196,14 +1235,26 @@ function GUI:RenderCrateGrid()
 
     -- กรองรายชื่อกล่อง
     local cratesList = {}
-    for name, info in pairs(CratesInfo) do
-        if type(info) == "table" then
-            local crateName = info.Name or name
-            if crateName ~= "KeKa Crate" then 
-                table.insert(cratesList, {Name = crateName, Image = info.Image or "0"})
+    pcall(function()
+        if not CratesInfo or type(CratesInfo) ~= "table" then 
+            warn("⚠️ CratesInfo not available")
+            return 
+        end
+        for name, info in pairs(CratesInfo) do
+            if type(info) == "table" then
+                local crateName = info.Name or name
+                if crateName and crateName ~= "KeKa Crate" then 
+                    table.insert(cratesList, {Name = crateName, Image = info.Image or "0"})
+                end
             end
         end
+    end)
+    
+    if #cratesList == 0 then
+        warn("⚠️ No crates available to display")
+        return
     end
+    
     table.sort(cratesList, function(a, b) return a.Name < b.Name end)
 
     -- วนลูปสร้างการ์ดแต่ละใบ
@@ -1334,7 +1385,11 @@ function GUI:RenderCrateGrid()
                     Service = "CratesService", 
                     Category = "Crates"
                 }, oldAmount, self.StatusLabel, {
-                    UpdateTradeViewer = function() self:UpdateTradeViewer() end
+                    UpdateTradeViewer = function() 
+                        if self.UpdateTradeViewer then 
+                            pcall(function() self:UpdateTradeViewer() end) 
+                        end 
+                    end
                 })
             else
                 self:ShowQuantityPopup({Default = 1000, Max = 9999}, function(qty)
@@ -1349,7 +1404,11 @@ function GUI:RenderCrateGrid()
                         Service = "CratesService", 
                         Category = "Crates"
                     }, qty, self.StatusLabel, {
-                        UpdateTradeViewer = function() self:UpdateTradeViewer() end
+                        UpdateTradeViewer = function() 
+                            if self.UpdateTradeViewer then 
+                                pcall(function() self:UpdateTradeViewer() end) 
+                            end 
+                        end
                     })
                 end)
             end
@@ -1533,9 +1592,22 @@ function GUI:RenderTradeItems()
     local items = InventoryManager.CollectItems(StateManager.currentSubTab, playerData)
     
     for _, item in ipairs(items) do
+        if not item or not item.Name then 
+            warn("⚠️ Invalid item in RenderTradeItems")
+            continue 
+        end
+        
         -- 🔴 ใช้ GUID เป็นหลัก ถ้าไม่มีใช้ Category + Name
-        local uniqueKey = item.Guid or (item.Category .. "_" .. item.Name)
-        local inTrade = StateManager:IsInTrade(item.Guid, item.Name, item.Category)
+        local uniqueKey
+        if item.Guid and item.Guid ~= "" then
+            uniqueKey = tostring(item.Guid)
+        elseif StateManager.currentSubTab and item.Name then
+            uniqueKey = StateManager.currentSubTab .. "_" .. item.Name
+        else
+            uniqueKey = "Item_" .. item.Name
+        end
+        
+        local inTrade = StateManager:IsInTrade(item.Guid, item.Name, StateManager.currentSubTab)
         
         local prefix, textColor, bgColor, tag = ITEM_PREFIXES.Inventory, THEME.ItemInv, Color3.fromRGB(30, 35, 40), ""
         
@@ -1570,10 +1642,12 @@ function GUI:RenderTradeItems()
                 if inTrade then
                     -- 🔴 ใช้ uniqueKey เดียวกันในการ Remove
                     local tradeItem = StateManager.itemsInTrade[uniqueKey]
-                    TradeManager.SendTradeSignal("Remove", itemData, tradeItem.Amount, self.StatusLabel, {
-                        UpdateTradeViewer = function() self:UpdateTradeViewer() end,
-                        RefreshInventory = function() self:RefreshInventory() end
-                    })
+                    if tradeItem then
+                        TradeManager.SendTradeSignal("Remove", itemData, tradeItem.Amount, self.StatusLabel, {
+                            UpdateTradeViewer = function() self:UpdateTradeViewer() end,
+                            RefreshInventory = function() self:RefreshInventory() end
+                        })
+                    end
                 else
                     if StateManager.currentSubTab == "Crates" and item.Amount > 1 then
                         item.Max = item.Amount 
