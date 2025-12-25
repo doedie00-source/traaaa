@@ -23,7 +23,7 @@ local TradingService = Knit.GetService("TradingService")
 local ReplicaListener = Knit.GetController("ReplicaListener")
 local LocalPlayer = Players.LocalPlayer
 
--- Try to load CratesInfo securely
+
 local SuccessLoad, CratesInfo = pcall(function()
     return require(ReplicatedStorage.GameInfo.CratesInfo)
 end)
@@ -35,17 +35,14 @@ end
 local SuccessPets, PetsInfo = pcall(function()
     return require(ReplicatedStorage.GameInfo.PetsInfo)
 end)
-if not SuccessPets then 
-    warn("⚠️ Failed to load PetsInfo") 
-    PetsInfo = {} 
-end
+if not SuccessPets then PetsInfo = {} end
 
--- รายชื่อ Pet ที่ต้องการให้แสดงใน Gallery
+-- รายชื่อสัตว์ที่ต้องการให้โชว์ (แก้ชื่อตรงนี้ได้เลย)
 local TARGET_PETS_LIST = {
     "Meowrrior", "Batkin", "Xmastree", "Malame", "Meowl", "Medus"
 }
 
--- ฟังก์ชั่นเช็คว่าชื่อนี้อยู่ในลิสต์ที่ต้องการไหม
+-- ฟังชั่นเช็คชื่อสัตว์
 local function IsTargetPet(name)
     for _, v in pairs(TARGET_PETS_LIST) do
         if v == name then return true end
@@ -373,14 +370,11 @@ local StateManager = {
     currentDupeTab = "Scrolls",
     itemsInTrade = {},
     selectedCrates = {},
-    
-    selectedPets = {}, -- [[ เพิ่มบรรทัดนี้: เก็บ UUID ของสัตว์ที่เลือก ]]
-    
+    selectedPets = {}, 
     playerButtons = {},
     statusResetTask = nil,
     inputConnection = nil,
 }
-
 
 function StateManager:SetStatus(text, color, statusLabel)
     if self.statusResetTask then task.cancel(self.statusResetTask) end
@@ -1216,8 +1210,12 @@ function GUI:RefreshInventory()
     elseif StateManager.currentMainTab == "Dupe" then
         if StateManager.currentDupeTab == "Crates" then
             self:RenderCrateGrid()
+        
+        -- [[ เพิ่มเงื่อนไขนี้เข้าไป ]] --
         elseif StateManager.currentDupeTab == "Pets" then
-            self:RenderPetGallery() -- [[ เพิ่มเรียกฟังก์ชันนี้ ]]
+            self:RenderPetGallery()
+        -- [[ จบส่วนที่เพิ่ม ]] --
+
         else
             self:RenderDupeMenu()
         end
@@ -1344,184 +1342,6 @@ function GUI:RenderCrateGrid()
                     self:RefreshInventory()
                 end)
             end
-        end)
-    end
-end
-function GUI:RenderPetGallery()
-    -- 1. เตรียม Container
-    self.InvContainer.ScrollBarThickness = 4
-    self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
-    self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
-    
-    -- ล้างของเก่า
-    for _, child in pairs(self.InvContainer:GetChildren()) do
-        if not child:IsA("UIListLayout") and not child:IsA("UIGridLayout") then child:Destroy() end
-    end
-    if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
-
-    -- 2. สร้างปุ่ม Action Bar (ปุ่ม Dupe) ไว้ด้านบนสุด
-    local ActionBar = Instance.new("Frame")
-    ActionBar.Size = UDim2.new(1, 0, 0, 40)
-    ActionBar.BackgroundTransparency = 1
-    ActionBar.LayoutOrder = -1 -- ให้อยู่บนสุดเสมอ
-    ActionBar.Parent = self.InvContainer
-
-    local DupeBtn = UIFactory.CreateButton({
-        Size = UDim2.new(0.6, 0, 0, 30),
-        Position = UDim2.new(0.2, 0, 0, 5),
-        Text = "DUPE SELECTED PETS",
-        BgColor = THEME.BtnDupe,
-        CornerRadius = 6,
-        Parent = ActionBar,
-        OnClick = function()
-            -- [[ ส่วนนี้คือ Logic ที่จะใส่ภายหลัง ]] --
-            local count = 0
-            for uuid, _ in pairs(StateManager.selectedPets) do count = count + 1 end
-            
-            if count == 0 then
-                StateManager:SetStatus("⚠️ Select pets first!", THEME.Fail, self.StatusLabel)
-            else
-                StateManager:SetStatus("✨ Preparing to Dupe " .. count .. " Pets... (Logic Here)", THEME.Success, self.StatusLabel)
-                print("Selected UUIDs:", StateManager.selectedPets)
-                -- ใส่ Logic การ Dupe ของคุณตรงนี้
-            end
-        end
-    })
-
-    -- 3. สร้าง Grid Layout
-    local layout = self.InvContainer:FindFirstChild("UIGridLayout")
-    if not layout then
-        layout = Instance.new("UIGridLayout", self.InvContainer)
-        layout.CellPadding = UDim2.new(0, 8, 0, 8)
-        layout.CellSize = UDim2.new(0, 95, 0, 130)  -- ขนาดการ์ด
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        layout.Parent = self.InvContainer
-    end
-
-    -- 4. ดึงข้อมูล Pets
-    local replica = ReplicaListener:GetReplica()
-    local playerData = replica and replica.Data
-    local myPets = (playerData and playerData.PetsService and playerData.PetsService.Pets) or {}
-
-    -- แปลง Dictionary เป็น List เพื่อ sort
-    local petList = {}
-    for uuid, info in pairs(myPets) do
-        local pName = (type(info) == "table" and info.Name) or info
-        -- กรองเฉพาะชื่อที่ต้องการ
-        if IsTargetPet(pName) then
-            local evo = (type(info) == "table" and info.Evolution) or 0
-            table.insert(petList, {
-                UUID = uuid,
-                Name = pName,
-                Evolution = tonumber(evo) or 0,
-                RawInfo = info
-            })
-        end
-    end
-
-    -- เรียงลำดับ: Evo เยอะขึ้นก่อน -> ตามด้วยชื่อ
-    table.sort(petList, function(a, b)
-        if a.Evolution ~= b.Evolution then return a.Evolution > b.Evolution end
-        return a.Name < b.Name
-    end)
-
-    if #petList == 0 then
-        local emptyLbl = UIFactory.CreateLabel({
-            Text = "No target pets found in inventory.",
-            TextColor = Color3.fromRGB(150, 150, 150),
-            Parent = self.InvContainer
-        })
-        emptyLbl.Size = UDim2.new(1,0,0,50)
-        return
-    end
-
-    -- 5. วาดการ์ด (Render Cards)
-    for _, pet in ipairs(petList) do
-        local isSelected = StateManager.selectedPets[pet.UUID] == true
-        
-        -- กรอบหลัก (Card)
-        local Card = Instance.new("TextButton") -- ใช้ Button เพื่อให้กดได้ทั้งใบ
-        Card.Text = ""
-        Card.AutoButtonColor = false
-        Card.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-        Card.BackgroundTransparency = 0
-        Card.Parent = self.InvContainer
-        UIFactory.AddCorner(Card, 8)
-
-        -- เส้นขอบ (Stroke) - เปลี่ยนสีเมื่อเลือก
-        local strokeColor = isSelected and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(60, 60, 70)
-        local stroke = UIFactory.AddStroke(Card, strokeColor, 2, 0.5)
-
-        -- แถบสีพื้นหลังดาว (Rarity Header)
-        local Header = Instance.new("Frame")
-        Header.Size = UDim2.new(1, 0, 0, 20)
-        Header.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-        Header.BackgroundTransparency = 0.5
-        Header.Parent = Card
-        UIFactory.AddCorner(Header, 8)
-        
-        -- ดาว Evolution
-        local starsText = ""
-        if pet.Evolution > 0 then
-            starsText = string.rep("⭐", pet.Evolution)
-        end
-        
-        local StarLbl = Instance.new("TextLabel")
-        StarLbl.Text = starsText
-        StarLbl.Size = UDim2.new(1, 0, 1, 0)
-        StarLbl.BackgroundTransparency = 1
-        StarLbl.TextColor3 = Color3.fromRGB(255, 220, 50)
-        StarLbl.TextSize = 10
-        StarLbl.Font = Enum.Font.GothamBold
-        StarLbl.Parent = Header
-
-        -- รูปภาพ Pet
-        local Image = Instance.new("ImageLabel")
-        Image.Parent = Card
-        Image.BackgroundTransparency = 1
-        Image.Position = UDim2.new(0.5, -35, 0, 25) 
-        Image.Size = UDim2.new(0, 70, 0, 70)
-        Image.ScaleType = Enum.ScaleType.Fit
-        
-        -- หา ImageId จาก PetsInfo
-        local petImgId = "0"
-        if PetsInfo[pet.Name] and PetsInfo[pet.Name].Image then
-            petImgId = PetsInfo[pet.Name].Image
-        end
-        if not tostring(petImgId):find("rbxassetid://") then
-            petImgId = "rbxassetid://" .. petImgId
-        end
-        Image.Image = petImgId
-
-        -- ชื่อ Pet
-        local NameLbl = Instance.new("TextLabel")
-        NameLbl.Parent = Card
-        NameLbl.BackgroundTransparency = 1
-        NameLbl.Position = UDim2.new(0, 2, 1, -32) 
-        NameLbl.Size = UDim2.new(1, -4, 0, 30)
-        NameLbl.Font = Enum.Font.GothamBold
-        NameLbl.Text = pet.Name
-        NameLbl.TextColor3 = isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
-        NameLbl.TextSize = 11
-        NameLbl.TextWrapped = true
-        NameLbl.TextYAlignment = Enum.TextYAlignment.Center
-
-        -- ติ๊กถูกเมื่อเลือก (Checkmark)
-        if isSelected then
-            local Check = Instance.new("ImageLabel")
-            Check.Image = "rbxassetid://6031094667" -- ไอคอนติ๊กถูก
-            Check.ImageColor3 = Color3.fromRGB(0, 255, 100)
-            Check.BackgroundTransparency = 1
-            Check.Size = UDim2.new(0, 20, 0, 20)
-            Check.Position = UDim2.new(1, -25, 0, 25)
-            Check.Parent = Card
-        end
-
-        -- Event กดเลือก
-        Card.MouseButton1Click:Connect(function()
-            StateManager:TogglePetSelection(pet.UUID)
-            self:RenderPetGallery() -- รีเฟรชหน้าจอเพื่ออัปเดตกรอบสี
         end)
     end
 end
@@ -1694,6 +1514,174 @@ function GUI:RenderPlayersList()
         end
     end
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, count * 38)
+end
+
+function GUI:RenderPetGallery()
+    -- 1. เคลียร์พื้นที่และตั้งค่า Grid
+    for _, child in pairs(self.InvContainer:GetChildren()) do
+        if not child:IsA("UIListLayout") and not child:IsA("UIGridLayout") then child:Destroy() end
+    end
+    if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
+
+    self.InvContainer.ScrollBarThickness = 4
+    
+    local layout = self.InvContainer:FindFirstChild("UIGridLayout")
+    if not layout then
+        layout = Instance.new("UIGridLayout", self.InvContainer)
+        layout.CellPadding = UDim2.new(0, 8, 0, 8)
+        layout.CellSize = UDim2.new(0, 95, 0, 130) -- ขนาดการ์ด
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    end
+
+    -- 2. นับจำนวนที่เลือก
+    local selectCount = 0
+    for _ in pairs(StateManager.selectedPets) do selectCount = selectCount + 1 end
+
+    -- 3. สร้างปุ่ม Action Bar (ปุ่ม Dupe) ไว้ด้านบนสุด
+    -- เราใช้ Hack นิดหน่อยโดยสร้าง Frame เปล่าๆ มาดัน Grid ลง แล้วเอาปุ่มแปะที่ InvFrame
+    
+    -- ล้างปุ่มเก่าถ้ามี
+    if self.InvFrame:FindFirstChild("PetActionBar") then self.InvFrame.PetActionBar:Destroy() end
+    
+    local ActionBar = Instance.new("Frame")
+    ActionBar.Name = "PetActionBar"
+    ActionBar.Size = UDim2.new(1, 0, 0, 40)
+    ActionBar.Position = UDim2.new(0, 0, 0, 30) -- วางทับด้านบน
+    ActionBar.BackgroundTransparency = 1
+    ActionBar.Parent = self.InvFrame
+    ActionBar.ZIndex = 10
+
+    -- ปรับ ScrollView หลบปุ่ม
+    self.InvContainer.Position = UDim2.new(0, 5, 0, 30) 
+    self.InvContainer.Size = UDim2.new(1, -10, 1, -35)
+    
+    -- ลบปุ่ม Dupe Pet ทิ้งถ้าเปลี่ยนหน้า
+    if self.InvFrame:FindFirstChild("PetActionBar") then self.InvFrame.PetActionBar:Destroy() end
+
+    UIFactory.CreateButton({
+        Size = UDim2.new(0.5, 0, 0, 30),
+        Position = UDim2.new(0.25, 0, 0, 5),
+        Text = "DUPE SELECTED (" .. selectCount .. ")",
+        BgColor = (selectCount > 0) and THEME.BtnDupe or THEME.BtnDisabled,
+        TextColor = (selectCount > 0) and THEME.TextWhite or THEME.TextGray,
+        CornerRadius = 6,
+        Parent = ActionBar,
+        OnClick = function()
+            if selectCount == 0 then
+                StateManager:SetStatus("⚠️ Select pets first!", THEME.Fail, self.StatusLabel)
+            else
+                -- [[ LOGIC ที่คุณจะใส่ทีหลัง ]] --
+                print("UUIDs to Dupe:", StateManager.selectedPets)
+                StateManager:SetStatus("✨ Selected " .. selectCount .. " pets. Ready for Logic.", THEME.Success, self.StatusLabel)
+            end
+        end
+    })
+
+    -- 4. ดึงข้อมูล Pet
+    local replica = ReplicaListener:GetReplica()
+    local playerData = replica and replica.Data
+    local myPets = (playerData and playerData.PetsService and playerData.PetsService.Pets) or {}
+
+    local petList = {}
+    for uuid, info in pairs(myPets) do
+        local pName = (type(info) == "table" and info.Name) or info
+        
+        -- กรองเฉพาะชื่อที่ต้องการ
+        if IsTargetPet(pName) then
+            local evo = (type(info) == "table" and info.Evolution) or 0
+            table.insert(petList, {
+                UUID = uuid,
+                Name = pName,
+                Evolution = tonumber(evo) or 0,
+                RawInfo = info
+            })
+        end
+    end
+
+    -- เรียงลำดับ: Evo มากไปน้อย -> ชื่อ
+    table.sort(petList, function(a, b)
+        if a.Evolution ~= b.Evolution then return a.Evolution > b.Evolution end
+        return a.Name < b.Name
+    end)
+
+    if #petList == 0 then
+        local lbl = UIFactory.CreateLabel({
+            Text = "No target pets found in inventory.",
+            TextColor = THEME.TextGray,
+            Parent = self.InvContainer
+        })
+        lbl.Size = UDim2.new(1,0,0,50)
+        return
+    end
+
+    -- 5. วาดการ์ด
+    for _, pet in ipairs(petList) do
+        local isSelected = StateManager.selectedPets[pet.UUID] == true
+        
+        local Card = Instance.new("TextButton")
+        Card.Text = ""
+        Card.AutoButtonColor = false
+        Card.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+        Card.Parent = self.InvContainer
+        UIFactory.AddCorner(Card, 8)
+
+        -- เส้นขอบ (เขียวถ้าเลือก / เทาถ้าไม่เลือก)
+        local strokeColor = isSelected and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(60, 60, 70)
+        UIFactory.AddStroke(Card, strokeColor, isSelected and 2 or 1, 0.5)
+
+        -- ส่วนหัวแสดงดาว
+        local Header = Instance.new("Frame")
+        Header.Size = UDim2.new(1, 0, 0, 20)
+        Header.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        Header.BackgroundTransparency = 0.6
+        Header.Parent = Card
+        UIFactory.AddCorner(Header, 8)
+        
+        local starsText = (pet.Evolution > 0) and string.rep("⭐", pet.Evolution) or ""
+        local starLbl = Instance.new("TextLabel")
+        starLbl.Text = starsText
+        starLbl.Size = UDim2.new(1,0,1,0)
+        starLbl.BackgroundTransparency = 1
+        starLbl.TextColor3 = Color3.fromRGB(255, 220, 50)
+        starLbl.TextSize = 10
+        starLbl.Font = Enum.Font.GothamBold
+        starLbl.Parent = Header
+
+        -- รูปภาพ (ใช้ PetsInfo)
+        local Image = Instance.new("ImageLabel")
+        Image.BackgroundTransparency = 1
+        Image.Position = UDim2.new(0.5, -30, 0, 25) 
+        Image.Size = UDim2.new(0, 60, 0, 60)
+        Image.ScaleType = Enum.ScaleType.Fit
+        Image.Parent = Card
+
+        local imgId = "0"
+        if PetsInfo[pet.Name] and PetsInfo[pet.Name].Image then
+            imgId = PetsInfo[pet.Name].Image
+        end
+        if not tostring(imgId):find("rbxassetid://") then imgId = "rbxassetid://" .. imgId end
+        Image.Image = imgId
+
+        -- ชื่อ Pet
+        local NameLbl = Instance.new("TextLabel")
+        NameLbl.BackgroundTransparency = 1
+        NameLbl.Position = UDim2.new(0, 2, 1, -35) 
+        NameLbl.Size = UDim2.new(1, -4, 0, 30)
+        NameLbl.Font = Enum.Font.GothamBold
+        NameLbl.Text = pet.Name
+        NameLbl.TextColor3 = isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
+        NameLbl.TextSize = 10
+        NameLbl.TextWrapped = true
+        NameLbl.TextYAlignment = Enum.TextYAlignment.Center
+        NameLbl.Parent = Card
+
+        -- Logic การกดเลือก
+        Card.MouseButton1Click:Connect(function()
+            StateManager:TogglePetSelection(pet.UUID)
+            self:RenderPetGallery() -- รีเฟรชเพื่ออัพเดทสีกรอบและตัวเลขที่ปุ่ม
+        end)
+    end
 end
 
 function GUI:RenderTradeItems()
