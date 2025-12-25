@@ -229,6 +229,11 @@ function Utils.SanitizeNumberInput(textBox, maxValue, minValue)
     return connection
 end
 
+function Utils.CountTable(t)
+    local c = 0
+    for _ in pairs(t) do c = c + 1 end
+    return c
+end
 -- ========================================== --
 -- 🎨 UI Component Factory
 -- ========================================== --
@@ -1408,11 +1413,7 @@ function GUI:RenderPetGalleryV7()
     end
 end
 
-function Utils.CountTable(t)
-    local c = 0
-    for _ in pairs(t) do c = c + 1 end
-    return c
-end
+
 
 function GUI:RenderCrateGrid()
     self.InvContainer.ScrollBarThickness = 0
