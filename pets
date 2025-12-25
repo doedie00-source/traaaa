@@ -1,17 +1,8 @@
--- [[ 🎯 Universal Trade System V6.5 - Crate Dupe (Fixed) ]] --
--- Vgame 2338
--- วิธีใช้งาน cratesdupe
--- ใช้เวอชั่นนี้
--- 1 ใช้ตัวรับcrates ส่งเทรดไปหา ตัวdupe
--- 2 ตัวdupe add crates 
--- 3. คนคอมเฟริมคนแรกต้องเป็นคนcancel
-
--- 4 ใช้ตัวรับส่งหา ตัว dupe ละเทรดเปล่าๆอีกที
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/doedie00-source/trades/refs/heads/main/65dupecrates"))() --
+-- [[ 🎯 Universal Trade System V6.6 - Crate Dupe + Copy Button ]] --
+-- Vgame 2338 & Updated by AI
 -- ========================================== --
 -- 📦 Services & Dependencies
 -- ========================================== --
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
@@ -24,31 +15,13 @@ local TradingService = Knit.GetService("TradingService")
 local ReplicaListener = Knit.GetController("ReplicaListener")
 local LocalPlayer = Players.LocalPlayer
 
-
+-- Try to load CratesInfo securely
 local SuccessLoad, CratesInfo = pcall(function()
     return require(ReplicatedStorage.GameInfo.CratesInfo)
 end)
 if not SuccessLoad then 
     warn("⚠️ Failed to load CratesInfo") 
     CratesInfo = {} 
-end
-
-local SuccessPets, PetsInfo = pcall(function()
-    return require(ReplicatedStorage.GameInfo.PetsInfo)
-end)
-if not SuccessPets then PetsInfo = {} end
-
--- รายชื่อสัตว์ที่ต้องการให้โชว์ (แก้ชื่อตรงนี้ได้เลย)
-local TARGET_PETS_LIST = {
-    "Meowrrior", "Batkin", "Xmastree", "Malame", "Meowl", "Medus"
-}
-
--- ฟังชั่นเช็คชื่อสัตว์
-local function IsTargetPet(name)
-    for _, v in pairs(TARGET_PETS_LIST) do
-        if v == name then return true end
-    end
-    return false
 end
 
 -- Cleanup Old GUI
@@ -60,7 +33,7 @@ end
 -- ⚙️ Configuration & Constants
 -- ========================================== --
 local CONFIG = {
-    VERSION = "6.5",
+    VERSION = "6.6",
     GUI_NAME = "CleanTradeGUI",
     
     -- Window Settings
@@ -104,7 +77,8 @@ local THEME = {
     Success = Color3.fromRGB(85, 255, 127),
     Fail = Color3.fromRGB(255, 85, 85),
     DupeReady = Color3.fromRGB(0, 255, 200),
-    CrateSelected = Color3.fromRGB(0, 255, 100), -- Green border for crates
+    CrateSelected = Color3.fromRGB(0, 255, 100), 
+    CopyBtn = Color3.fromRGB(255, 200, 0) -- สีปุ่ม Copy
 }
 
 -- ข้อมูลสูตรการเสกของ (Dupe Recipes)
@@ -130,7 +104,7 @@ local DUPE_RECIPES = {
         {Name = "Mega Wins Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Wins Potion"},
         {Name = "Mega Exp Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Exp Potion"},
     },
-    Crates = {} -- Placeholder, will be populated dynamically
+    Crates = {} 
 }
 
 local HIDDEN_ITEMS = {
@@ -370,8 +344,7 @@ local StateManager = {
     currentSubTab = "Pets",
     currentDupeTab = "Scrolls",
     itemsInTrade = {},
-    selectedCrates = {},
-    selectedPets = {}, 
+    selectedCrates = {}, 
     playerButtons = {},
     statusResetTask = nil,
     inputConnection = nil,
@@ -421,14 +394,6 @@ function StateManager:ToggleCrateSelection(name, amount)
     end
 end
 
-function StateManager:TogglePetSelection(uuid)
-    if self.selectedPets[uuid] then
-        self.selectedPets[uuid] = nil
-    else
-        self.selectedPets[uuid] = true
-    end
-end
-
 -- ========================================== --
 -- 🔄 Trade Manager
 -- ========================================== --
@@ -464,33 +429,27 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         return
     end
     
-    -- ตรวจสอบว่าเป็นการเรียกจากหน้า Dupe หรือหน้า Trade ปกติ
     local isDupeMode = (StateManager.currentMainTab == "Dupe")
     
     local success, fakeBtn = pcall(function()
         local btn = Instance.new("ImageButton")
-        -- ใช้ GUID หรือชื่อ + Timestamp เพื่อให้ชื่อปุ่มไม่ซ้ำกันเด็ดขาด (แก้ปัญหา InTrade ยกแผง)
         local uniqueId = itemData.Guid or (itemData.Name .. "_" .. tick())
         btn.Name = "TradeItem_" .. uniqueId
         btn.Visible = false
         btn.Size = UDim2.new(0, 100, 0, 100)
         btn.BackgroundTransparency = 1
         
-        -- [[ 1. Basic Attributes ]]
         btn:SetAttribute("Service", itemData.Service)
         btn:SetAttribute("Index", itemData.Name) 
         btn:SetAttribute("Quantity", amount)
         btn:SetAttribute("IsEquipped", false)
         
-        -- [[ 2. Special Logic for Crates (แยกประเภท Dupe กับ Real) ]]
         if itemData.Category == "Crates" then
              btn:SetAttribute("ItemName", itemData.Name)
              btn:SetAttribute("Name", itemData.Name)
              btn:SetAttribute("Amount", amount)
              btn:SetAttribute("Service", "CratesService")
              
-             -- ถ้าเป็นโหมด Dupe (เสกกล่องที่ไม่มีในตัว) ให้เพิ่ม Tag พิเศษ
-             -- เพื่อให้ระบบจำลอง (Fake) ทำงานแยกจากระบบ Hidden Trade
              if isDupeMode then
                  btn:SetAttribute("IsFakeDupe", true)
              else
@@ -498,13 +457,10 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
              end
         end
 
-        -- [[ 3. Handling GUID (สำหรับ Accessory/Pets) ]]
-        -- สำคัญมาก: ถ้าเป็นไอเทมจริงต้องมี GUID เพื่อให้ระบบระบุตัวชิ้นนั้นๆ ได้
         if itemData.Guid then 
             btn:SetAttribute("Guid", tostring(itemData.Guid)) 
         end
 
-        -- [[ 4. Extra Info ]]
         if itemData.RawInfo then
             if itemData.RawInfo.Evolution then btn:SetAttribute("Evolution", itemData.RawInfo.Evolution) end
             if itemData.RawInfo.Shiny then btn:SetAttribute("Shiny", true) end
@@ -521,15 +477,11 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         return
     end
     
-    -- [[ 5. Execute Action ]]
     pcall(function()
-        -- ใช้ GUID เป็น Key ถ้าไม่มี (กรณีกล่อง) ให้ใช้ชื่อไอเทมแทน
         local key = itemData.Guid or itemData.Name
-        
         if action == "Add" then
             TradeController:AddToTradeData(fakeBtn, amount)
             StateManager:AddToTrade(key, itemData)
-            
             local modePrefix = isDupeMode and "✨ Dupe: " or "✅ Added: "
             StateManager:SetStatus(modePrefix .. itemData.Name, THEME.ItemInv, statusLabel)
         elseif action == "Remove" then
@@ -539,17 +491,38 @@ function TradeManager.SendTradeSignal(action, itemData, amount, statusLabel, cal
         end
     end)
     
-    -- ทำลายปุ่มจำลองทิ้งหลังจากส่งสัญญาณเสร็จ
     task.delay(0.5, function() 
         if fakeBtn and fakeBtn.Parent then 
             fakeBtn:Destroy() 
         end 
     end)
     
-    -- รัน Callback เพื่ออัปเดต UI หน้าจอของเรา
     if callbacks then
         if callbacks.UpdateTradeViewer then callbacks.UpdateTradeViewer() end
         if callbacks.RefreshInventory then callbacks.RefreshInventory() end
+    end
+end
+
+-- [[ Function to AUTO ADD selected crates ]]
+function TradeManager.AutoCopyCrates(statusLabel)
+    if not Utils.IsTradeActive() then
+        StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, statusLabel)
+        return
+    end
+    
+    local count = 0
+    for name, amount in pairs(StateManager.selectedCrates) do
+        local itemData = { Name = name, Service = "CratesService", Category = "Crates" }
+        -- เรียกใช้ SendTradeSignal เพื่อให้ logic เหมือนการกดปกติ (มี IsFakeDupe attribute)
+        TradeManager.SendTradeSignal("Add", itemData, amount, statusLabel, nil)
+        count = count + 1
+        task.wait(0.1) -- Delay นิดหน่อยเพื่อความปลอดภัย
+    end
+    
+    if count > 0 then
+        StateManager:SetStatus("⚡ Auto Copied " .. count .. " types to trade!", THEME.Success, statusLabel)
+    else
+        StateManager:SetStatus("⚠️ No crates selected!", THEME.Fail, statusLabel)
     end
 end
 
@@ -966,7 +939,7 @@ function GUI:UpdateSubTabs()
     if StateManager.currentMainTab == "Trade" then
         tabs = {"Pets", "Secrets", "Accessories", "Crates"}
     elseif StateManager.currentMainTab == "Dupe" then
-        tabs = {"Scrolls", "Tickets", "Potions", "Crates", "Pets"} 
+        tabs = {"Scrolls", "Tickets", "Potions", "Crates"} 
     end
     
     for _, tabName in ipairs(tabs) do
@@ -1027,6 +1000,31 @@ function GUI:CreateCenterPanel()
         Visible = false
     })
     self.DupeWarning.TextWrapped = true
+    
+    -- [[ NEW: Crate Dupe Actions Panel ]]
+    self.CrateActionPanel = UIFactory.CreateFrame({
+        Size = UDim2.new(1, -20, 0, 45),
+        Position = UDim2.new(0, 10, 1, -55),
+        BgTransparency = 1,
+        Parent = self.InvFrame,
+        Corner = false
+    })
+    self.CrateActionPanel.Visible = false
+    
+    -- [[ The COPY Button ]]
+    self.CopyCratesBtn = UIFactory.CreateButton({
+        Size = UDim2.new(1, 0, 1, 0),
+        Text = "⚡ COPY TO TRADE (Auto Add)",
+        BgColor = THEME.CopyBtn,
+        TextColor = Color3.new(0,0,0),
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        CornerRadius = 8,
+        Parent = self.CrateActionPanel,
+        OnClick = function()
+            TradeManager.AutoCopyCrates(self.StatusLabel)
+        end
+    })
 end
 
 function GUI:CreateRightPanel()
@@ -1146,6 +1144,7 @@ end
 function GUI:UpdateUIState()
     self:UpdateSubTabs()
     self.DupeWarning.Visible = false
+    self.CrateActionPanel.Visible = false -- Reset
     
     -- Reset Scroll Layout
     if self.InvContainer:FindFirstChild("UIGridLayout") then
@@ -1178,6 +1177,9 @@ function GUI:UpdateUIState()
         
         if StateManager.currentDupeTab == "Crates" then
             self.DupeWarning.Visible = false
+            -- [[ SHOW COPY BUTTON ]]
+            self.CrateActionPanel.Visible = true
+            self.InvContainer.Size = UDim2.new(1, -10, 1, -85) -- ลดขนาดลงให้มีที่วางปุ่ม
         else
             self.DupeWarning.Visible = true
             self.InvContainer.Size = UDim2.new(1, -10, 1, -95)
@@ -1211,17 +1213,12 @@ function GUI:RefreshInventory()
     elseif StateManager.currentMainTab == "Dupe" then
         if StateManager.currentDupeTab == "Crates" then
             self:RenderCrateGrid()
-        
-        -- [[ เพิ่มเงื่อนไขนี้เข้าไป ]] --
-        elseif StateManager.currentDupeTab == "Pets" then
-            self:RenderPetGallery()
-        -- [[ จบส่วนที่เพิ่ม ]] --
-
         else
             self:RenderDupeMenu()
         end
     end
-end 
+end
+
 function GUI:RenderCrateGrid()
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
@@ -1242,7 +1239,6 @@ function GUI:RenderCrateGrid()
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
-    -- 1. กรองรายชื่อกล่องและเก็บทั้ง "Key ในระบบ" และ "ชื่อที่ใช้แสดง"
     local cratesList = {}
     for internalId, info in pairs(CratesInfo) do
         if type(info) == "table" then
@@ -1250,7 +1246,7 @@ function GUI:RenderCrateGrid()
             if displayName ~= "KeKa Crate" then 
                 table.insert(cratesList, {
                     DisplayName = displayName, 
-                    InternalID = internalId, -- รหัสอ้างอิงภายใน (เช่น "Bronze")
+                    InternalID = internalId,
                     Image = info.Image or "0"
                 })
             end
@@ -1261,7 +1257,6 @@ function GUI:RenderCrateGrid()
     for _, crate in ipairs(cratesList) do
         local amountInInv = inventoryCrates[crate.DisplayName] or inventoryCrates[crate.InternalID]
         
-
         local isOwnedInSystem = (amountInInv ~= nil)
         local isSelected = StateManager.selectedCrates[crate.DisplayName] ~= nil
 
@@ -1272,7 +1267,6 @@ function GUI:RenderCrateGrid()
         Card.BackgroundTransparency = isOwnedInSystem and 0.4 or 0
         UIFactory.AddCorner(Card, 6)
         
-
         local strokeColor = Color3.fromRGB(55, 55, 60)
         if isOwnedInSystem then
             strokeColor = Color3.fromRGB(180, 40, 40) 
@@ -1322,25 +1316,19 @@ function GUI:RenderCrateGrid()
         ClickBtn.Text = ""
 
         ClickBtn.MouseButton1Click:Connect(function()
-            if not Utils.IsTradeActive() then
-                StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, self.StatusLabel)
-                return
-            end
+            -- ในโหมด Dupe > Crates การคลิกคือการ "เลือกเพื่อรอ Copy" ไม่ใช่การส่งเทรดทันที
             if isOwnedInSystem then
                 StateManager:SetStatus("🚫 Locked: This crate exists in your inventory history.", Color3.fromRGB(255, 80, 80), self.StatusLabel)
                 return 
             end
 
             if StateManager.selectedCrates[crate.DisplayName] then
-                local oldAmount = StateManager.selectedCrates[crate.DisplayName]
                 StateManager:ToggleCrateSelection(crate.DisplayName, nil)
-                TradeManager.SendTradeSignal("Remove", { Name = crate.DisplayName, Service = "CratesService", Category = "Crates" }, oldAmount, self.StatusLabel)
-                self:RefreshInventory()
+                self:RefreshInventory() -- Refresh UI เพื่ออัปเดตสีกรอบ
             else
                 self:ShowQuantityPopup({Default = 1000, Max = 9999}, function(qty)
                     StateManager:ToggleCrateSelection(crate.DisplayName, qty)
-                    TradeManager.SendTradeSignal("Add", { Name = crate.DisplayName, Service = "CratesService", Category = "Crates" }, qty, self.StatusLabel)
-                    self:RefreshInventory()
+                    self:RefreshInventory() -- Refresh UI เพื่อแสดงกรอบเขียว
                 end)
             end
         end)
@@ -1515,160 +1503,6 @@ function GUI:RenderPlayersList()
         end
     end
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, count * 38)
-end
-
-function GUI:RenderPetGallery()
-    -- [[ 1. ล้างข้อมูลเก่าให้เกลี้ยงก่อนเริ่ม ]] --
-    if self.InvFrame:FindFirstChild("PetActionBar") then self.InvFrame.PetActionBar:Destroy() end
-    for _, child in pairs(self.InvContainer:GetChildren()) do
-        if not child:IsA("UIGridLayout") then child:Destroy() end
-    end
-
-    -- [[ 2. สร้างแถบปุ่ม Dupe ไว้บนสุด (ตำแหน่ง 0) ]] --
-    local ActionBar = Instance.new("Frame")
-    ActionBar.Name = "PetActionBar"
-    ActionBar.Size = UDim2.new(1, 0, 0, 45)
-    ActionBar.Position = UDim2.new(0, 0, 0, 5) -- อยู่บนสุด
-    ActionBar.BackgroundTransparency = 1
-    ActionBar.Parent = self.InvFrame
-    ActionBar.ZIndex = 10
-
-    local selectCount = 0
-    for _ in pairs(StateManager.selectedPets) do selectCount = selectCount + 1 end
-
-    UIFactory.CreateButton({
-        Size = UDim2.new(0.6, 0, 0, 35),
-        Position = UDim2.new(0.2, 0, 0, 5),
-        Text = "🚀 DUPE SELECTED (" .. selectCount .. ")",
-        BgColor = (selectCount > 0) and THEME.BtnDupe or Color3.fromRGB(45, 45, 50),
-        TextColor = (selectCount > 0) and Color3.new(1, 1, 1) or Color3.fromRGB(130, 130, 135),
-        CornerRadius = 8,
-        Parent = ActionBar,
-        OnClick = function()
-            if selectCount > 0 then
-                print("--- UUID LIST TO DUPE ---")
-                for uuid, _ in pairs(StateManager.selectedPets) do print(uuid) end
-                StateManager:SetStatus("✨ Process " .. selectCount .. " pets", THEME.Success, self.StatusLabel)
-            end
-        end
-    })
-
-    -- [[ 3. ปรับตารางสัตว์เลี้ยงให้ลงมาด้านล่าง (Position 50) จะได้ไม่ทับปุ่ม ]] --
-    self.InvContainer.Position = UDim2.new(0, 5, 0, 50) -- เริ่มต้นที่ 50 เพื่อหลบปุ่มด้านบน
-    self.InvContainer.Size = UDim2.new(1, -10, 1, -60)
-    self.InvContainer.ScrollBarThickness = 2
-
-    local layout = self.InvContainer:FindFirstChild("UIGridLayout")
-    if not layout then
-        layout = Instance.new("UIGridLayout", self.InvContainer)
-        layout.CellPadding = UDim2.new(0, 10, 0, 10)
-        layout.CellSize = UDim2.new(0, 105, 0, 150) -- ขยายความสูงเพื่อใส่ UUID
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    end
-
-    -- [[ 4. ดึงข้อมูลสัตว์เลี้ยง ]] --
-    local replica = ReplicaListener:GetReplica()
-    local playerData = replica and replica.Data
-    local myPets = (playerData and playerData.PetsService and playerData.PetsService.Pets) or {}
-    local equippedList = (playerData and playerData.PetsService and playerData.PetsService.EquippedPets) or {}
-
-    local petList = {}
-    for uuid, info in pairs(myPets) do
-        local pName = (type(info) == "table" and info.Name) or info
-        if IsTargetPet(pName) then
-            local isEquip = false
-            for _, eqId in pairs(equippedList) do if eqId == uuid then isEquip = true break end end
-            table.insert(petList, {
-                UUID = uuid,
-                Name = pName,
-                Evo = (type(info) == "table" and info.Evolution) or 0,
-                Equipped = isEquip
-            })
-        end
-    end
-    table.sort(petList, function(a, b) if a.Equipped ~= b.Equipped then return a.Equipped end return a.Evo > b.Evo end)
-
-    -- [[ 5. สร้างการ์ด (ไม่มีขอบดำทับรูปแล้ว) ]] --
-    for _, pet in ipairs(petList) do
-        local isSelected = StateManager.selectedPets[pet.UUID] == true
-        
-        local Card = Instance.new("TextButton")
-        Card.Text = ""
-        Card.AutoButtonColor = false
-        Card.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-        Card.Parent = self.InvContainer
-        UIFactory.AddCorner(Card, 10)
-
-        -- ขอบตามสถานะ
-        local stroke = UIFactory.AddStroke(Card, Color3.fromRGB(50, 50, 55), 1, 0.4)
-        if pet.Equipped then stroke.Color = Color3.fromRGB(255, 60, 60)
-        elseif isSelected then stroke.Color = Color3.fromRGB(0, 255, 120); stroke.Thickness = 2 end
-
-        -- แสดงดาว (Text เล็กๆ มุมซ้าย)
-        if pet.Evo > 0 then
-            local star = UIFactory.CreateLabel({
-                Text = string.rep("⭐", pet.Evo),
-                TextSize = 8,
-                Position = UDim2.new(0, 5, 0, 5),
-                Size = UDim2.new(0, 50, 0, 15),
-                TextColor = Color3.fromRGB(255, 220, 50),
-                TextXAlign = Enum.TextXAlignment.Left,
-                Parent = Card
-            })
-        end
-
-        -- รูปสัตว์เลี้ยง
-        local Image = Instance.new("ImageLabel")
-        Image.BackgroundTransparency = 1
-        Image.Position = UDim2.new(0.5, -35, 0, 20)
-        Image.Size = UDim2.new(0, 70, 0, 70)
-        Image.ScaleType = Enum.ScaleType.Fit
-        Image.Image = (PetsInfo[pet.Name] and PetsInfo[pet.Name].Image) or ""
-        Image.Parent = Card
-
-        -- ชื่อ (สีแดงถ้าใส่ชุด)
-        UIFactory.CreateLabel({
-            Text = pet.Name,
-            TextSize = 10,
-            Font = Enum.Font.GothamBold,
-            Position = UDim2.new(0, 5, 0, 95),
-            Size = UDim2.new(1, -10, 0, 15),
-            TextColor = pet.Equipped and Color3.fromRGB(255, 70, 70) or Color3.new(1,1,1),
-            Parent = Card
-        })
-
-        -- แสดงรหัส UUID (สำคัญ)
-        UIFactory.CreateLabel({
-            Text = "UUID: " .. string.sub(pet.UUID, 1, 13) .. "...",
-            TextSize = 7,
-            Position = UDim2.new(0, 5, 0, 110),
-            Size = UDim2.new(1, -10, 0, 15),
-            TextColor = Color3.fromRGB(150, 150, 160),
-            Parent = Card
-        })
-
-        -- แท็กสถานะ
-        if pet.Equipped then
-            UIFactory.CreateLabel({
-                Text = "[EQUIPPED]",
-                TextSize = 8,
-                Font = Enum.Font.GothamBold,
-                Position = UDim2.new(0, 5, 0, 125),
-                Size = UDim2.new(1, -10, 0, 15),
-                TextColor = Color3.fromRGB(255, 70, 70),
-                Parent = Card
-            })
-        end
-
-        Card.MouseButton1Click:Connect(function()
-            if pet.Equipped then
-                StateManager:SetStatus("🚫 Unequip this pet first!", THEME.Fail, self.StatusLabel)
-            else
-                StateManager:TogglePetSelection(pet.UUID)
-                self:RenderPetGallery()
-            end
-        end)
-    end
 end
 
 function GUI:RenderTradeItems()
