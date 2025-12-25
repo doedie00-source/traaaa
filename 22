@@ -1328,18 +1328,44 @@ function GUI:RefreshInventory()
 end
 
 function GUI:RenderPetDupeGrid()
-    -- [[ INTEGRATED PET GALLERY V7 LOGIC (ADJUSTED) ]] --
+    -- [[ 🛠️ สร้าง Tooltip (ตัวแสดงเลข UID) ถ้ายังไม่มี ]] --
+    if not self.TooltipRef then
+        local tip = Instance.new("TextLabel")
+        tip.Name = "GlobalTooltip"
+        tip.Size = UDim2.new(0, 250, 0, 30)
+        tip.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+        tip.TextColor3 = Color3.new(1, 1, 1)
+        tip.TextSize = 12
+        tip.Font = Enum.Font.Code
+        tip.ZIndex = 300
+        tip.Visible = false
+        tip.Parent = self.ScreenGui -- ใส่ไว้ที่หน้าจอหลัก
+        
+        UIFactory.AddStroke(tip, THEME.BtnSelected, 1, 0.5)
+        UIFactory.AddCorner(tip, 6)
+        
+        self.TooltipRef = tip
+        
+        -- ระบบขยับตามเมาส์
+        UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and self.TooltipRef.Visible then
+                self.TooltipRef.Position = UDim2.new(0, input.Position.X + 15, 0, input.Position.Y + 15)
+            end
+        end)
+    end
+
+    -- [[ UI SETUP ]] --
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
     
-    -- 1. [FIX] เพิ่ม Padding เพื่อไม่ให้การ์ดชิดขอบบน/ล่าง/ซ้าย/ขวา เกินไป
+    -- Padding (ระยะห่างขอบ)
     if not self.InvContainer:FindFirstChild("UIPadding") then
         local padding = Instance.new("UIPadding", self.InvContainer)
-        padding.PaddingTop = UDim.new(0, 10)    -- เว้นขอบบน
-        padding.PaddingBottom = UDim.new(0, 10) -- เว้นขอบล่าง
-        padding.PaddingLeft = UDim.new(0, 10)   -- เว้นซ้าย
-        padding.PaddingRight = UDim.new(0, 10)  -- เว้นขวา
+        padding.PaddingTop = UDim.new(0, 10)
+        padding.PaddingBottom = UDim.new(0, 10)
+        padding.PaddingLeft = UDim.new(0, 10)
+        padding.PaddingRight = UDim.new(0, 10)
     end
     
     if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
@@ -1347,7 +1373,6 @@ function GUI:RenderPetDupeGrid()
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
     if not layout then
         layout = Instance.new("UIGridLayout", self.InvContainer)
-        -- 2. [FIX] ลดความสูง (ค่าตัวหลัง) จาก 135 เหลือ 120
         layout.CellSize = UDim2.new(0, 100, 0, 120) 
         layout.CellPadding = UDim2.new(0, 10, 0, 10)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -1391,6 +1416,7 @@ function GUI:RenderPetDupeGrid()
             imageId = "rbxassetid://" .. tostring(PetsInfo[petName].Image)
         end
 
+        -- CARD FRAME
         local Card = Instance.new("Frame")
         Card.Name = uuid 
         Card.BackgroundColor3 = THEME.CardBg
@@ -1486,7 +1512,6 @@ function GUI:RenderPetDupeGrid()
         end
 
         local Viewport = Instance.new("ImageLabel")
-        -- [FIX] ปรับตำแหน่งรูปขึ้นนิดหน่อย เพราะการ์ดเตี้ยลง (จากเดิม Y 20 -> 15)
         Viewport.Size = UDim2.new(0, 65, 0, 65)
         Viewport.Position = UDim2.new(0.5, -32.5, 0, 15) 
         Viewport.BackgroundTransparency = 1
@@ -1498,28 +1523,61 @@ function GUI:RenderPetDupeGrid()
         local NameLbl = Instance.new("TextLabel")
         NameLbl.Text = petName
         NameLbl.Size = UDim2.new(1, -4, 0, 30)
-        -- [FIX] ปรับตำแหน่งชื่อขึ้นตามรูป (จากเดิม Y 85 -> 78)
         NameLbl.Position = UDim2.new(0, 2, 0, 78)
         NameLbl.BackgroundTransparency = 1
         NameLbl.TextColor3 = Color3.new(1,1,1)
         NameLbl.Font = Enum.Font.GothamBold
-        NameLbl.TextSize = 10 -- ลดขนาดฟอนต์นิดนึงให้สมดุล
+        NameLbl.TextSize = 10
         NameLbl.TextWrapped = true
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
         NameLbl.Parent = Card
         
+        -- [[ 📌 UUID DISPLAY SECTION ]] --
         local shortID = uuid:sub(1, 5) .. ".." .. uuid:sub(#uuid - 4, #uuid)
+        
         local UUIDDisplay = Instance.new("TextLabel")
         UUIDDisplay.Text = shortID
         UUIDDisplay.Size = UDim2.new(1, -8, 0, 16)
         UUIDDisplay.Position = UDim2.new(0, 4, 1, -20)
-        UUIDDisplay.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        UUIDDisplay.TextColor3 = Color3.fromRGB(150, 150, 150)
-        UUIDDisplay.Font = Enum.Font.Code
-        UUIDDisplay.TextSize = 9
+        UUIDDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 30) -- พื้นหลังเข้มขึ้นนิดนึง
+        
+        -- [FIX 1] สีตัวอักษรเป็นสีขาว (White) และตัวหนา
+        UUIDDisplay.TextColor3 = Color3.fromRGB(255, 255, 255) 
+        UUIDDisplay.Font = Enum.Font.Code -- ใช้ Font Code ให้อ่านง่าย
+        UUIDDisplay.TextSize = 10
         UUIDDisplay.ZIndex = 3
         UUIDDisplay.Parent = Card
         UIFactory.AddCorner(UUIDDisplay, 4)
+        UIFactory.AddStroke(UUIDDisplay, Color3.fromRGB(60,60,60), 1, 0.5)
+
+        -- [FIX 2] Invisible Button สำหรับ Mouse Hover
+        local HoverTrigger = Instance.new("TextButton")
+        HoverTrigger.Text = ""
+        HoverTrigger.BackgroundTransparency = 1
+        HoverTrigger.Size = UDim2.new(1, 0, 1, 0)
+        HoverTrigger.Parent = UUIDDisplay
+        HoverTrigger.ZIndex = 10
+        
+        HoverTrigger.MouseEnter:Connect(function()
+            if self.TooltipRef then
+                self.TooltipRef.Text = " UUID: " .. uuid .. " " -- ใส่เลขเต็ม
+                self.TooltipRef.Visible = true
+                -- เปลี่ยนสี Stroke ให้รู้ว่ากำลังชี้
+                if UUIDDisplay:FindFirstChild("UIStroke") then
+                    UUIDDisplay.UIStroke.Color = THEME.BtnSelected
+                end
+            end
+        end)
+        
+        HoverTrigger.MouseLeave:Connect(function()
+            if self.TooltipRef then
+                self.TooltipRef.Visible = false
+                -- คืนสี Stroke เดิม
+                if UUIDDisplay:FindFirstChild("UIStroke") then
+                    UUIDDisplay.UIStroke.Color = Color3.fromRGB(60,60,60)
+                end
+            end
+        end)
     end
 end
 
