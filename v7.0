@@ -1,4 +1,4 @@
--- [[ 🎯 Universal Trade System V6.6 - Pet Gallery Integration ]] --
+-- [[ 🎯 Universal Trade System V7.0 - Pet Gallery Integration ]] --
 -- Integrated Pet Gallery V7 UI into Dupe Tab
 -- Preserved original Trade functionality
 
@@ -34,7 +34,7 @@ end
 -- ⚙️ Configuration & Constants
 -- ========================================== --
 local CONFIG = {
-    VERSION = "6.6 (Pet UI)",
+    VERSION = "7.0 (Pet UI)",
     GUI_NAME = "CleanTradeGUI",
     
     -- Window Settings
