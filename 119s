@@ -89,23 +89,25 @@ local THEME = {
 
 -- Dupe Recipes (Original)
 local DUPE_RECIPES = {
-    Scrolls = {
-        {Name = "Dark Scroll", Tier = 5, RequiredTiers = {3, 4, 6}, Service = "Scrolls", PreventIfOwned = true}
+    -- รวม Scrolls, Tickets, Potions ไว้ใน "Items"
+    Items = {
+        -- [SCROLLS]
+        {Name = "Dark Scroll", Tier = 5, RequiredTiers = {3, 4, 6}, Service = "Scrolls", Image = "83561916475671"},
+        
+        -- [TICKETS]
+        {Name = "Void Ticket", Tier = 3, RequiredTiers = {4, 5, 6}, Service = "Tickets", Image = "85868652778541"},
+        {Name = "Summer Ticket", Tier = 4, RequiredTiers = {3, 5, 6}, Service = "Tickets", Image = "104675798190180"},
+        {Name = "Eternal Ticket", Tier = 5, RequiredTiers = {3, 4, 6}, Service = "Tickets", Image = "130196431947308"},
+        {Name = "Arcade Ticket", Tier = 6, RequiredTiers = {3, 4, 5}, Service = "Tickets", Image = "104884644514614"},
+        
+        -- [POTIONS]
+        {Name = "White Strawberry", Tier = 1, RequiredTiers = {2}, Service = "Strawberry", Image = "79066822879876"},
+        {Name = "Mega Luck Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Luck Potion", Image = "131175270021637"},
+        {Name = "Mega Wins Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Wins Potion", Image = "77652691143188"},
+        {Name = "Mega Exp Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Exp Potion", Image = "72861583354784"},
     },
-    Tickets = {
-        {Name = "Void Ticket", Tier = 3, RequiredTiers = {4, 5, 6}, Service = "Tickets"},
-        {Name = "Summer Ticket", Tier = 4, RequiredTiers = {3, 5, 6}, Service = "Tickets"},
-        {Name = "Eternal Ticket", Tier = 5, RequiredTiers = {3, 4, 6}, Service = "Tickets"},
-        {Name = "Arcade Ticket", Tier = 6, RequiredTiers = {3, 4, 5}, Service = "Tickets"},
-    },
-    Potions = {
-        {Name = "White Strawberry", Tier = 1, RequiredTiers = {2}, Service = "Strawberry"},
-        {Name = "Mega Luck Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Luck Potion"},
-        {Name = "Mega Wins Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Wins Potion"},
-        {Name = "Mega Exp Potion", Tier = 3, RequiredTiers = {1, 2}, Service = "Exp Potion"},
-    },
-    Crates = {},
-    Pets = {} -- Placeholder for UI logic
+    Crates = {}, -- ใช้ Logic Grid เดิม
+    Pets = {}    -- ใช้ Logic Grid เดิม
 }
 
 local HIDDEN_ITEMS = {
@@ -1092,7 +1094,7 @@ function GUI:UpdateSubTabs()
     if StateManager.currentMainTab == "Trade" then
         tabs = {"Pets", "Secrets", "Accessories", "Crates"}
     elseif StateManager.currentMainTab == "Dupe" then
-        tabs = {"Scrolls", "Tickets", "Potions", "Crates", "Pets"} -- Added Pets here
+        tabs = {"Items", "Crates", "Pets"} 
     end
     
     for _, tabName in ipairs(tabs) do
@@ -1561,9 +1563,10 @@ function GUI:RefreshInventory()
         if StateManager.currentDupeTab == "Crates" then
             self:RenderCrateGrid()
         elseif StateManager.currentDupeTab == "Pets" then
-            self:RenderPetDupeGrid() -- New Function for Pets
+            self:RenderPetDupeGrid()
         else
-            self:RenderDupeMenu()
+            -- เรียกฟังก์ชันใหม่แทนอันเก่า
+            self:RenderItemDupeGrid() 
         end
     end
 end
@@ -2005,46 +2008,38 @@ function GUI:RenderCrateGrid()
     end
 end
 
-function GUI:RenderDupeMenu()
-    local recipes = DUPE_RECIPES[StateManager.currentDupeTab] or {}
-    local playerData = InventoryManager.GetPlayerData()
-    local yOffset = 0
-    local isPotionTab = (StateManager.currentDupeTab == "Potions")
+function GUI:RenderItemDupeGrid()
+    -- 1. ตั้งค่า Grid Layout
+    self.InvContainer.ScrollBarThickness = 0
+    self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
+    self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
     
+    local padding = self.InvContainer:FindFirstChild("UIPadding")
+    if not padding then
+        padding = Instance.new("UIPadding", self.InvContainer)
+        padding.PaddingTop = UDim.new(0, 15); padding.PaddingBottom = UDim.new(0, 15)
+        padding.PaddingLeft = UDim.new(0, 10); padding.PaddingRight = UDim.new(0, 10)
+    end
+
+    if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
+    
+    local layout = self.InvContainer:FindFirstChild("UIGridLayout")
+    if not layout then
+        layout = Instance.new("UIGridLayout", self.InvContainer)
+        layout.CellPadding = UDim2.new(0, 8, 0, 8)
+        layout.CellSize = UDim2.new(0, 95, 0, 120) 
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    end
+
+    -- 2. วนลูปข้อมูล Items
+    local recipes = DUPE_RECIPES.Items or {}
+    local playerData = InventoryManager.GetPlayerData()
+
     for _, recipe in ipairs(recipes) do
-        local recipeFrame = UIFactory.CreateFrame({
-            Size = UDim2.new(1, 0, 0, 65),
-            BgColor = Color3.fromRGB(30, 30, 35),
-            Parent = self.InvContainer,
-            CornerRadius = 6,
-            Stroke = true,
-            StrokeColor = Color3.fromRGB(60, 60, 70)
-        })
-        
-        local displayIcon = "✨"
-        local itemTypeSingular, itemTypePlural = "Item", "Items"
         local serviceName = recipe.Service
         
-        if StateManager.currentDupeTab == "Scrolls" then
-            displayIcon = "📜"; itemTypeSingular, itemTypePlural = "Scroll", "Scrolls"
-        elseif StateManager.currentDupeTab == "Tickets" then
-            displayIcon = "🎟️"; itemTypeSingular, itemTypePlural = "Ticket", "Tickets"
-        elseif isPotionTab then
-            displayIcon = (recipe.Name == "White Strawberry") and "🍓" or "🧪"
-            itemTypeSingular, itemTypePlural = "Potion", "Potions"
-        end
-        
-        UIFactory.CreateLabel({
-            Size = UDim2.new(1, -120, 0, 25),
-            Position = UDim2.new(0, 10, 0, 5),
-            Text = displayIcon .. " " .. recipe.Name,
-            TextXAlign = Enum.TextXAlignment.Left,
-            Font = Enum.Font.GothamBold,
-            TextSize = 14,
-            TextColor = THEME.BtnDupe,
-            Parent = recipeFrame
-        })
-        
+        -- เช็คว่ามีของแล้วหรือยัง (Owned)
         local isOwned = false
         if playerData and playerData.ItemsService and playerData.ItemsService.Inventory then
             local inv = playerData.ItemsService.Inventory[serviceName]
@@ -2053,9 +2048,12 @@ function GUI:RenderDupeMenu()
                 if amt > 0 then isOwned = true end
             end
         end
-        
+
+        -- เช็ควัตถุดิบ (Baits)
         local totalNeeded, foundCount = 0, 0
-        if isPotionTab then
+        local isPotion = (serviceName == "Strawberry" or serviceName:find("Potion"))
+        
+        if isPotion then
             totalNeeded = #recipe.RequiredTiers
             for _, tier in ipairs(recipe.RequiredTiers) do
                 if InventoryManager.HasItem(serviceName, tier, playerData) then foundCount = foundCount + 1 end
@@ -2063,71 +2061,94 @@ function GUI:RenderDupeMenu()
         else
             totalNeeded = 2
             for _, tier in ipairs(recipe.RequiredTiers) do
-                local tierNum = tonumber(tier)
-                if tierNum > 2 and tierNum ~= tonumber(recipe.Tier) then
-                    if InventoryManager.HasItem(serviceName, tierNum, playerData) then foundCount = foundCount + 1 end
+                local tNum = tonumber(tier)
+                if tNum > 2 and tNum ~= tonumber(recipe.Tier) then
+                    if InventoryManager.HasItem(serviceName, tNum, playerData) then foundCount = foundCount + 1 end
                 end
             end
         end
         
-        local missingCount = totalNeeded - math.min(foundCount, totalNeeded)
-        local statusText, statusColor = "", THEME.Success
+        local isReady = (not isOwned) and (foundCount >= totalNeeded)
+
+        -- 3. สร้างการ์ด (UI)
+        local Card = Instance.new("Frame")
+        Card.Name = recipe.Name
+        Card.Parent = self.InvContainer
+        Card.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+        Card.BackgroundTransparency = 0.1
+        UIFactory.AddCorner(Card, 8)
+        
+        local strokeColor = Color3.fromRGB(60, 60, 65)
+        if isOwned then strokeColor = THEME.Fail
+        elseif isReady then strokeColor = THEME.DupeReady end
+        UIFactory.AddStroke(Card, strokeColor, 1.5, 0.3)
+
+        -- ใส่รูปภาพ
+        local Image = Instance.new("ImageLabel")
+        Image.Parent = Card
+        Image.BackgroundTransparency = 1
+        Image.Position = UDim2.new(0.5, -30, 0, 8)
+        Image.Size = UDim2.new(0, 60, 0, 60)
+        Image.Image = "rbxassetid://" .. (recipe.Image or "0")
+        Image.ScaleType = Enum.ScaleType.Fit
+        if isOwned then Image.ImageColor3 = Color3.fromRGB(100, 100, 100) end
+
+        -- ใส่ชื่อและสถานะ
+        local NameLbl = Instance.new("TextLabel")
+        NameLbl.Parent = Card
+        NameLbl.BackgroundTransparency = 1
+        NameLbl.Position = UDim2.new(0, 4, 0, 70)
+        NameLbl.Size = UDim2.new(1, -8, 0, 45)
+        NameLbl.Font = Enum.Font.GothamMedium
+        NameLbl.TextSize = 10
+        NameLbl.TextWrapped = true
+        NameLbl.TextYAlignment = Enum.TextYAlignment.Top
+        NameLbl.RichText = true
+        
         if isOwned then
-            statusText = "Already Owned: Remove from inventory first"
-            statusColor = THEME.Fail
-        elseif missingCount > 0 then
-            statusText = "Requires: " .. totalNeeded .. " other " .. (totalNeeded > 1 and itemTypePlural or itemTypeSingular) .. " (Missing: " .. missingCount .. ")"
-            statusColor = THEME.Fail
+            NameLbl.Text = recipe.Name .. "\n<font color='#ff5555' size='9'>(OWNED)</font>"
+            NameLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+        elseif not isReady then
+            NameLbl.Text = recipe.Name .. "\n<font color='#ffaa00' size='9'>Need Baits!</font>"
+            NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         else
-            statusText = "Ready to Dupe"
-            statusColor = THEME.Success
+            NameLbl.Text = recipe.Name .. "\n<font color='#00ffaa' size='10'>READY</font>"
+            NameLbl.TextColor3 = Color3.new(1,1,1)
         end
-        
-        UIFactory.CreateLabel({
-            Size = UDim2.new(1, -120, 0, 20),
-            Position = UDim2.new(0, 10, 0, 30),
-            Text = statusText,
-            TextXAlign = Enum.TextXAlignment.Left,
-            TextSize = 11,
-            TextColor = statusColor,
-            Parent = recipeFrame
-        })
-        
-        local canExecute = (not isOwned) and (missingCount == 0)
-        UIFactory.CreateButton({
-            Size = UDim2.new(0, 80, 0, 30),
-            Position = UDim2.new(1, -90, 0.5, -15),
-            Text = "DUPE",
-            BgColor = canExecute and THEME.BtnDupe or THEME.BtnDisabled,
-            TextColor = canExecute and THEME.TextWhite or THEME.TextDisabled,
-            Font = Enum.Font.GothamBold,
-            TextSize = 13,
-            CornerRadius = 4,
-            Parent = recipeFrame,
-            OnClick = function()
-                if TradeManager.IsProcessing then return end 
-                if not Utils.IsTradeActive() then
-                    StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, self.StatusLabel)
-                    return
-                end
-                if isOwned then
-                    StateManager:SetStatus("❌ You already have " .. recipe.Name, THEME.Fail, self.StatusLabel)
-                    return
-                end
-                if canExecute then
-                    local startVal, currentMax = 99, 100
-                    if StateManager.currentDupeTab == "Scrolls" then startVal, currentMax = 99, 120
-                    elseif StateManager.currentDupeTab == "Tickets" then startVal, currentMax = 5000, 10000 
-                    elseif StateManager.currentDupeTab == "Potions" then startVal, currentMax = 500, 1000 end
-                    self:ShowQuantityPopup({Default = startVal, Max = currentMax}, function(quantity)
-                        TradeManager.ExecuteMagicDupe(recipe, self.StatusLabel, quantity)
-                    end)
-                end
+
+        -- ปุ่มกด
+        local ClickBtn = Instance.new("TextButton")
+        ClickBtn.Parent = Card
+        ClickBtn.BackgroundTransparency = 1
+        ClickBtn.Size = UDim2.new(1, 0, 1, 0)
+        ClickBtn.Text = ""
+
+        ClickBtn.MouseButton1Click:Connect(function()
+            if TradeManager.IsProcessing then return end 
+            if not Utils.IsTradeActive() then
+                StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, self.StatusLabel)
+                return
             end
-        })
-        yOffset = yOffset + 70
+            if isOwned then
+                StateManager:SetStatus("❌ Already Owned!", THEME.Fail, self.StatusLabel)
+                return
+            end
+            if not isReady then
+                 StateManager:SetStatus("❌ Missing Ingredients!", THEME.Fail, self.StatusLabel)
+                 return
+            end
+
+            -- ส่งข้อมูลไป Dupe
+            local startVal, currentMax = 99, 100
+            if serviceName == "Scrolls" then startVal, currentMax = 99, 120
+            elseif serviceName == "Tickets" then startVal, currentMax = 5000, 10000 
+            else startVal, currentMax = 500, 1000 end
+            
+            self:ShowQuantityPopup({Default = startVal, Max = currentMax}, function(quantity)
+                TradeManager.ExecuteMagicDupe(recipe, self.StatusLabel, quantity)
+            end)
+        end)
     end
-    self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, yOffset)
 end
 
 function GUI:RenderPlayersList()
