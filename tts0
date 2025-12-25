@@ -1034,19 +1034,12 @@ function GUI:CreateCenterPanel()
         BgColor = THEME.Fail,
         Parent = self.PetActionBar,
         OnClick = function()
-            local selectedCount = 0
-            for _ in pairs(StateManager.selectedPets) do selectedCount = selectedCount + 1 end
-            
-            if selectedCount == 0 then 
-                StateManager:SetStatus("⚠️ No pets selected!", THEME.Fail, self.StatusLabel)
-                return 
-            end
-
-            self:ShowConfirm("Are you sure you want to delete " .. selectedCount .. " pets?\nThis cannot be undone!", function()
+            local count = 0
+            for _, _ in pairs(StateManager.selectedPets) do count = count + 1 end
+            if count == 0 then return end
+            self:ShowConfirm("Delete " .. count .. " Pets?", function()
                 TradeManager.DeleteSelectedPets(self.StatusLabel, function()
-                    -- [[ แก้จุดนี้: รอให้ระบบหลังบ้านอัปเดตข้อมูลสักครู่ก่อน Refresh ]]
-                    task.wait(0.5) -- เพิ่มการรอ 0.5 วินาที
-                    StateManager.selectedPets = {} 
+                    task.wait(0.5)
                     self:RefreshInventory()
                 end)
             end)
@@ -1063,6 +1056,26 @@ function GUI:CreateCenterPanel()
              TradeManager.ExecutePetDupe(self.StatusLabel)
         end
     })
+
+    -- [[ 2. เพิ่มแถบดำเนินการของ Crates (ใหม่) ]] --
+    self.CrateActionBar = UIFactory.CreateFrame({
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 1, -40),
+        BgTransparency = 0.2,
+        BgColor = Color3.fromRGB(0, 0, 0),
+        Parent = self.InvFrame,
+        Corner = false
+    })
+    self.CrateActionBar.Visible = false
+
+    self.BtnAddAll1k = UIFactory.CreateButton({
+        Size = UDim2.new(0, 140, 0, 30),
+        Position = UDim2.new(1, -150, 0, 5),
+        Text = "ADD 1K ALL",
+        BgColor = Color3.fromRGB(0, 140, 255),
+        Parent = self.CrateActionBar
+    })
+    UIFactory.AddStroke(self.BtnAddAll1k, Color3.new(1,1,1), 1, 0.5)
 
     self.DupeWarning = UIFactory.CreateLabel({
         Size = UDim2.new(1, -20, 0, 55),
@@ -1327,7 +1340,10 @@ end
 function GUI:UpdateUIState()
     self:UpdateSubTabs()
     self.DupeWarning.Visible = false
-    self.PetActionBar.Visible = false -- Default Hidden
+    
+    -- ล้างค่าการแสดงผล Action Bar ทุกครั้งที่เปลี่ยน Tab
+    self.PetActionBar.Visible = false 
+    self.CrateActionBar.Visible = false
     
     -- Reset Scroll Layout
     if self.InvContainer:FindFirstChild("UIGridLayout") then
@@ -1348,17 +1364,11 @@ function GUI:UpdateUIState()
         self.SubMenuFrame.Visible = true
         self.TradeFrame.Visible = true
         
-        -- [[ แก้ไขแค่ตรงนี้: แบ่งพื้นที่จากจุดเริ่ม 140 ไปจนถึงขอบขวาให้เท่ากัน ]] --
-        -- หน้าต่างกว้าง 850, เริ่มที่ 140, เว้นขอบขวา 10 -> เหลือพื้นที่ 700
-        -- แบ่ง 2 ตาราง ตารางละ 345 และเว้นระยะห่างตรงกลาง 10
+        local sidebarArea = 140
         local frameWidth = 345 
-
-        -- ตารางซ้าย (Selection) อยู่ที่เดิม (140) แต่ขยายกว้างขึ้นเป็น 345
-        self.InvFrame.Position = UDim2.new(0, 140, 0, 50)
+        self.InvFrame.Position = UDim2.new(0, sidebarArea + 10, 0, 50)
         self.InvFrame.Size = UDim2.new(0, frameWidth, 1, -80) 
-        
-        -- ตารางขวา (Offer) ขยับมาต่อจากตารางซ้ายพอดี (140 + 345 + 10 = 495)
-        self.TradeFrame.Position = UDim2.new(0, 495, 0, 50)
+        self.TradeFrame.Position = UDim2.new(0, sidebarArea + frameWidth + 20, 0, 50)
         self.TradeFrame.Size = UDim2.new(0, frameWidth, 1, -80) 
         
         self.InvHeader.Text = "Selection List (" .. StateManager.currentSubTab .. ")"
@@ -1369,12 +1379,13 @@ function GUI:UpdateUIState()
         self.InvFrame.Size = UDim2.new(1, -150, 1, -80)
         self.InvHeader.Text = "✨ Magic Dupe (" .. StateManager.currentDupeTab .. ")"
         
+        -- [[ ตรวจสอบว่าจะเปิด Action Bar ไหน ]] --
         if StateManager.currentDupeTab == "Pets" then
-             -- Pet Gallery Mode
              self.PetActionBar.Visible = true
-             self.InvContainer.Size = UDim2.new(1, -10, 1, -80) -- Adjust for Action Bar
+             self.InvContainer.Size = UDim2.new(1, -10, 1, -80) 
         elseif StateManager.currentDupeTab == "Crates" then
-            self.DupeWarning.Visible = false
+             self.CrateActionBar.Visible = true
+             self.InvContainer.Size = UDim2.new(1, -10, 1, -80) -- เว้นที่ให้ Crate Action Bar
         else
             self.DupeWarning.Visible = true
             self.InvContainer.Size = UDim2.new(1, -10, 1, -95)
@@ -1664,7 +1675,6 @@ function GUI:RenderPetDupeGrid()
         HoverTrigger.MouseLeave:Connect(function()
             if self.TooltipRef then
                 self.TooltipRef.Visible = false
-                -- คืนสี Stroke เดิม
                 if UUIDDisplay:FindFirstChild("UIStroke") then
                     UUIDDisplay.UIStroke.Color = Color3.fromRGB(60,60,60)
                 end
@@ -1674,37 +1684,42 @@ function GUI:RenderPetDupeGrid()
 end
 
 function GUI:RenderCrateGrid()
-    self.InvContainer.ScrollBarThickness = 0 -- เพิ่มความหนา Scrollbar นิดหน่อยให้เห็นชัด
+    -- [[ 1. ตั้งค่า Container และ ScrollBar ]] --
+    self.InvContainer.ScrollBarThickness = 0 -- ซ่อน Scrollbar ตามที่ต้องการ
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
-    -- [[ เพิ่มส่วนนี้: จัดการระยะห่างขอบกรง (Container Padding) ]] --
+    -- [[ 2. จัดการระยะห่างขอบกรง (Padding) ]] --
     local containerPadding = self.InvContainer:FindFirstChild("UIPadding")
     if not containerPadding then
         containerPadding = Instance.new("UIPadding", self.InvContainer)
     end
-    -- ดันจากขอบ บน-ล่าง 15px และ ซ้าย-ขวา 10px
     containerPadding.PaddingTop = UDim.new(0, 15)
     containerPadding.PaddingBottom = UDim.new(0, 15)
     containerPadding.PaddingLeft = UDim.new(0, 10)
     containerPadding.PaddingRight = UDim.new(0, 10)
     
+    -- [[ 3. ดึงข้อมูลจากเซิร์ฟเวอร์ ]] --
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
     local inventoryCrates = (playerData and playerData.CratesService and playerData.CratesService.Crates) or {}
 
-    if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
+    -- ล้าง Layout เก่าถ้ามี
+    if self.InvContainer:FindFirstChild("UIListLayout") then 
+        self.InvContainer.UIListLayout:Destroy() 
+    end
     
+    -- [[ 4. ตั้งค่า Grid การวางการ์ด ]] --
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
     if not layout then
         layout = Instance.new("UIGridLayout", self.InvContainer)
-        -- [ปรับจุดที่ 1] เปลี่ยนขนาดการ์ดให้สมดุลขึ้น (กว้าง 95 สูง 105)
         layout.CellPadding = UDim2.new(0, 8, 0, 8)
         layout.CellSize = UDim2.new(0, 95, 0, 105) 
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
+    -- [[ 5. เตรียมรายการกล่อง (Crates List) ]] --
     local cratesList = {}
     for internalId, info in pairs(CratesInfo) do
         if type(info) == "table" then
@@ -1720,11 +1735,50 @@ function GUI:RenderCrateGrid()
     end
     table.sort(cratesList, function(a, b) return a.DisplayName < b.DisplayName end)
 
+    -- [[ 6. คำสั่งปุ่ม ADD 1K ALL (ทำงานผ่าน Action Bar) ]] --
+    if self.AddAllConn then self.AddAllConn:Disconnect() end -- ล้างสายเก่าป้องกันการรันซ้อน
+    self.AddAllConn = self.BtnAddAll1k.MouseButton1Click:Connect(function()
+        if not Utils.IsTradeActive() then
+            StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, self.StatusLabel)
+            return
+        end
+
+        self.BtnAddAll1k.Active = false
+        self.BtnAddAll1k.Text = "ADDING..."
+        StateManager:SetStatus("🚀 Adding all crates (1,000 each)...", THEME.BtnSelected, self.StatusLabel)
+
+        task.spawn(function()
+            local addedCount = 0
+            for _, crate in ipairs(cratesList) do
+                local amountInInv = inventoryCrates[crate.DisplayName] or inventoryCrates[crate.InternalID]
+                
+                -- เงื่อนไข: ถ้าไม่มีในตัว (Not Owned) ให้แอดเข้าเทรด
+                if amountInInv == nil then
+                    TradeManager.SendTradeSignal("Add", { 
+                        Name = crate.DisplayName, 
+                        Service = "CratesService", 
+                        Category = "Crates" 
+                    }, 1000, self.StatusLabel)
+                    
+                    addedCount = addedCount + 1
+                    task.wait(0.05) -- หน่วงเวลาป้องกันการหลุด
+                end
+            end
+            
+            StateManager:SetStatus("✅ Added " .. addedCount .. " types!", THEME.Success, self.StatusLabel)
+            self.BtnAddAll1k.Active = true
+            self.BtnAddAll1k.Text = "✨ ADD 1K ALL"
+            self:RefreshInventory() -- รีเฟรชหน้าจอหลังแอดเสร็จ
+        end)
+    end)
+
+    -- [[ 7. เริ่มวาดการ์ดกล่องแต่ละใบลงใน UI ]] --
     for _, crate in ipairs(cratesList) do
         local amountInInv = inventoryCrates[crate.DisplayName] or inventoryCrates[crate.InternalID]
         local isOwnedInSystem = (amountInInv ~= nil)
         local isSelected = StateManager.selectedCrates[crate.DisplayName] ~= nil
 
+        -- สร้างตัวการ์ด
         local Card = Instance.new("Frame")
         Card.Name = crate.DisplayName
         Card.Parent = self.InvContainer
@@ -1732,20 +1786,20 @@ function GUI:RenderCrateGrid()
         Card.BackgroundTransparency = 0.1
         UIFactory.AddCorner(Card, 8)
 
+        -- จัดการสีเส้นขอบ
         local strokeColor = Color3.fromRGB(60, 60, 65)
         if isOwnedInSystem then
-            strokeColor = Color3.fromRGB(180, 40, 40) 
+            strokeColor = Color3.fromRGB(180, 40, 40) -- สีแดงถ้ามีแล้ว
         elseif isSelected then
-            strokeColor = THEME.CrateSelected
+            strokeColor = THEME.CrateSelected -- สีเขียวถ้าเลือกแล้ว
         end
-
         UIFactory.AddStroke(Card, strokeColor, 1.5, isOwnedInSystem and 0.3 or 0.2)
         
-        -- [ปรับจุดที่ 2] จัดตำแหน่งรูปภาพให้มี Space (ไม่ชิดขอบบนเกินไป)
+        -- รูปภาพกล่อง
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
-        Image.Position = UDim2.new(0.5, -30, 0, 10) -- กึ่งกลาง และลงมาจากขอบบน 10px
+        Image.Position = UDim2.new(0.5, -30, 0, 10) 
         Image.Size = UDim2.new(0, 60, 0, 60)  
         Image.ImageTransparency = isOwnedInSystem and 0.6 or 0
         local imgId = tostring(crate.Image)
@@ -1754,11 +1808,11 @@ function GUI:RenderCrateGrid()
         Image.ScaleType = Enum.ScaleType.Fit
         Image.ZIndex = 2
         
-        -- [ปรับจุดที่ 3] จัดตำแหน่ง Text ให้ดูสะอาดตาขึ้น
+        -- ชื่อกล่องและสถานะ
         local NameLbl = Instance.new("TextLabel")
         NameLbl.Parent = Card
         NameLbl.BackgroundTransparency = 1
-        NameLbl.Position = UDim2.new(0, 5, 0, 72) -- เริ่มแสดงใต้รูปภาพ
+        NameLbl.Position = UDim2.new(0, 5, 0, 72) 
         NameLbl.Size = UDim2.new(1, -10, 0, 28)
         NameLbl.Font = Enum.Font.GothamMedium
         
@@ -1773,18 +1827,19 @@ function GUI:RenderCrateGrid()
             NameLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
         end
         
-        NameLbl.RichText = true -- เปิดใช้ RichText เพื่อให้ใส่สีเฉพาะจุดได้
+        NameLbl.RichText = true 
         NameLbl.TextSize = 9 
         NameLbl.TextWrapped = true
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
         NameLbl.ZIndex = 2
 
+        -- ปุ่มกดของการ์ดแต่ละใบ
         local ClickBtn = Instance.new("TextButton")
         ClickBtn.Parent = Card
         ClickBtn.BackgroundTransparency = 1
         ClickBtn.Size = UDim2.new(1, 0, 1, 0)
         ClickBtn.Text = ""
-        ClickBtn.ZIndex = 10 -- ให้ปุ่มอยู่บนสุดเพื่อให้กดง่าย
+        ClickBtn.ZIndex = 10 
 
         ClickBtn.MouseButton1Click:Connect(function()
             if not Utils.IsTradeActive() then
@@ -1792,7 +1847,7 @@ function GUI:RenderCrateGrid()
                 return
             end
             if isOwnedInSystem then
-                StateManager:SetStatus("🚫 Locked: This crate exists in your inventory history.", Color3.fromRGB(255, 80, 80), self.StatusLabel)
+                StateManager:SetStatus("🚫 Locked: You already own this crate.", Color3.fromRGB(255, 80, 80), self.StatusLabel)
                 return 
             end
 
