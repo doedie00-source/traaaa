@@ -1034,11 +1034,18 @@ function GUI:CreateCenterPanel()
         BgColor = THEME.Fail,
         Parent = self.PetActionBar,
         OnClick = function()
-            local count = 0
-            for _, _ in pairs(StateManager.selectedPets) do count = count + 1 end
-            if count == 0 then return end
-            self:ShowConfirm("Delete " .. count .. " Pets?", function()
+            local selectedCount = 0
+            for _ in pairs(StateManager.selectedPets) do selectedCount = selectedCount + 1 end
+            
+            if selectedCount == 0 then 
+                StateManager:SetStatus("⚠️ No pets selected!", THEME.Fail, self.StatusLabel)
+                return 
+            end
+
+            self:ShowConfirm("Are you sure you want to delete " .. selectedCount .. " pets?\nThis cannot be undone!", function()
                 TradeManager.DeleteSelectedPets(self.StatusLabel, function()
+                    -- ล้างตารางที่เลือกและรีเฟรชหน้าจอ
+                    StateManager.selectedPets = {} 
                     self:RefreshInventory()
                 end)
             end)
@@ -1142,6 +1149,8 @@ function GUI:CreatePopup()
     })
 end
 
+local currentConfirmConn = nil -- ตัวแปรเก็บ Connection เพื่อป้องกันการรันซ้อน
+
 function GUI:CreateConfirmOverlay()
     self.ConfirmOverlay = UIFactory.CreateFrame({
         Size = UDim2.new(1, 0, 1, 0),
@@ -1151,7 +1160,7 @@ function GUI:CreateConfirmOverlay()
         Corner = false
     })
     self.ConfirmOverlay.Visible = false
-    self.ConfirmOverlay.ZIndex = 250
+    self.ConfirmOverlay.ZIndex = 500 -- เพิ่ม ZIndex ให้สูงที่สุด
     
     local box = UIFactory.CreateFrame({
         Size = UDim2.new(0, 300, 0, 150),
@@ -1159,15 +1168,17 @@ function GUI:CreateConfirmOverlay()
         BgColor = Color3.fromRGB(40, 40, 40),
         Parent = self.ConfirmOverlay
     })
+    UIFactory.AddStroke(box, THEME.Fail, 2)
     
     self.ConfirmTitle = UIFactory.CreateLabel({
         Text = "CONFIRM?",
-        Size = UDim2.new(1, 0, 0, 40),
+        Size = UDim2.new(1, 0, 0, 60),
         Font = Enum.Font.GothamBold,
-        TextSize = 18,
+        TextSize = 16,
         Parent = box
     })
-    
+    self.ConfirmTitle.TextWrapped = true
+
     local btnContainer = Instance.new("Frame")
     btnContainer.Size = UDim2.new(1, 0, 0, 50)
     btnContainer.Position = UDim2.new(0, 0, 1, -60)
@@ -1179,28 +1190,44 @@ function GUI:CreateConfirmOverlay()
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.Padding = UDim.new(0, 20)
     
+    -- ปุ่ม CANCEL
     UIFactory.CreateButton({
         Text = "CANCEL",
+        Size = UDim2.new(0, 100, 0, 35),
         BgColor = Color3.fromRGB(80, 80, 80),
         Parent = btnContainer,
-        OnClick = function() self.ConfirmOverlay.Visible = false end
+        OnClick = function() 
+            if currentConfirmConn then currentConfirmConn:Disconnect() end -- ล้างการเชื่อมต่อเมื่อยกเลิก
+            self.ConfirmOverlay.Visible = false 
+        end
     })
     
+    -- ปุ่ม YES
     self.ConfirmYesBtn = UIFactory.CreateButton({
-        Text = "YES",
+        Text = "YES, DELETE",
+        Size = UDim2.new(0, 120, 0, 35),
         BgColor = THEME.Fail,
         Parent = btnContainer
     })
 end
 
 function GUI:ShowConfirm(text, onYes)
+    -- ล้าง Connection เก่าทิ้งก่อนเสมอเพื่อป้องกันบัคกดครั้งเดียวรันหลายรอบ
+    if currentConfirmConn then 
+        currentConfirmConn:Disconnect() 
+        currentConfirmConn = nil
+    end
+
     self.ConfirmTitle.Text = text
     self.ConfirmOverlay.Visible = true
     
-    local conn
-    conn = self.ConfirmYesBtn.MouseButton1Click:Connect(function()
+    -- สร้างการเชื่อมต่อใหม่และเก็บไว้ในตัวแปร
+    currentConfirmConn = self.ConfirmYesBtn.MouseButton1Click:Connect(function()
+        if currentConfirmConn then
+            currentConfirmConn:Disconnect()
+            currentConfirmConn = nil
+        end
         self.ConfirmOverlay.Visible = false
-        conn:Disconnect()
         onYes()
     end)
 end
