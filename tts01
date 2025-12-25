@@ -647,7 +647,14 @@ function TradeManager.ExecuteMagicDupe(recipe, statusLabel, amount)
 end
 
 function TradeManager.ExecutePetDupe(statusLabel)
-    -- [[ 🎯 NEW PET DUPE LOGIC HOOK ]] --
+    -- [[ 1. ตรวจสอบสถานะเทรดและ Debounce กัน Spam ]] --
+    if TradeManager.IsProcessing then return end
+    if not Utils.IsTradeActive() then
+        StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, statusLabel)
+        return
+    end
+
+    -- ตรวจสอบรายการที่เลือก
     local selectedUUIDs = {}
     for uuid, selected in pairs(StateManager.selectedPets) do
         if selected then table.insert(selectedUUIDs, uuid) end
@@ -658,19 +665,110 @@ function TradeManager.ExecutePetDupe(statusLabel)
         return
     end
 
+    -- [[ 2. ดึงข้อมูลจำเป็น (Replica & Crates) ]] --
+    local replica = ReplicaListener:GetReplica()
+    if not replica or not replica.Data then 
+        StateManager:SetStatus("❌ Data Error!", THEME.Fail, statusLabel)
+        return 
+    end
+
+    local playerData = replica.Data
+    local myPets = playerData.PetsService and playerData.PetsService.Pets or {}
+    local inventoryCrates = (playerData.CratesService and playerData.CratesService.Crates) or {}
+
+    -- [[ 3. สุ่มเลือก 1 Crate ที่เราไม่มีในตัว (Bait Crate) ]] --
+    local availableBaitCrates = {}
+    
+    for internalId, info in pairs(CratesInfo) do
+        if type(info) == "table" then
+            local displayName = info.Name or internalId
+            
+            -- [[ ตรวจสอบความบริสุทธิ์ของข้อมูล: ต้องเป็น nil เท่านั้น ]] --
+            -- ถ้ามีคีย์ชื่อนี้อยู่ (ต่อให้เป็น 0) rawget หรือการเช็คโดยตรงจะส่งค่ากลับมาที่ไม่ใช่ nil
+            local hasNameKey = (playerData.CratesService.Crates[displayName] ~= nil)
+            local hasIdKey = (playerData.CratesService.Crates[internalId] ~= nil)
+            
+            -- เงื่อนไข: ต้อง "ไม่ปรากฏชื่อนี้เลย" ทั้งสองรูปแบบ
+            if not hasNameKey and not hasIdKey and displayName ~= "KeKa Crate" then
+                table.insert(availableBaitCrates, displayName)
+            end
+        end
+    end
+
+    -- [[ หยุดทำงานทันทีหากพบความเสี่ยง (ไม่มีกล่องที่สะอาดพอ) ]] --
+    if #availableBaitCrates == 0 then
+        StateManager:SetStatus("❌ No 'Pure Nil' crates found!", THEME.Fail, statusLabel)
+        TradeManager.IsProcessing = false
+        return 
+    end
+
+    -- สุ่มเลือกมา 1 ชื่อจากรายการที่สะอาดที่สุด
+    local baitCrateName = availableBaitCrates[math.random(1, #availableBaitCrates)]
+    if #availableBaitCrates > 0 then
+        baitCrateName = availableBaitCrates[math.random(1, #availableBaitCrates)]
+    end
+
+    -- [[ 4. เตรียม Pets Payload (บังคับ Evolution = 2) ]] --
+    local petPayload = {}
+    for _, uuid in ipairs(selectedUUIDs) do
+        local petData = myPets[uuid]
+        if petData then
+            petPayload[uuid] = {
+                Name = petData.Name,
+                Evolution = 2 -- บังคับใส่ Evolution 2 ตามเงื่อนไขข้อ 4
+            }
+        end
+    end
+
+    -- [[ 5. ค้นหา Trade ID (จากตรรกะเดิมที่มีในสคริปต์) ]] --
+    local realTradeId = TradeManager.GetGameTradeId()
+    if not realTradeId then
+        -- Fallback: หาจากตัวผู้เล่นคนอื่นในเซิร์ฟเวอร์ (ถ้าหาจาก memory ไม่เจอ)
+        for _, p in pairs(game.Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                realTradeId = p.UserId
+                break
+            end
+        end
+    end
+
+    if not realTradeId then
+        StateManager:SetStatus("❌ Trade ID not found!", THEME.Fail, statusLabel)
+        return
+    end
+
+    -- [[ 6. ส่งข้อมูลไปยังเซิร์ฟเวอร์ (InvokeServer) ]] --
     TradeManager.IsProcessing = true
-    StateManager:SetStatus("✨ Preparing Dupe ("..#selectedUUIDs.." pets)...", THEME.BtnDupe, statusLabel)
+    StateManager:SetStatus("✨ Executing Pet Dupe...", THEME.BtnDupe, statusLabel)
+
+    local remote = ReplicatedStorage.Packages.Knit.Services.TradingService.RF:FindFirstChild("UpdateTradeOffer")
     
-    -- Placeholder for the new logic we will design together
-    task.wait(1)
-    print("DEBUG: Executing Pet Dupe on UUIDs:", table.concat(selectedUUIDs, ", "))
-    
-    -- Example Logic Step (To be implemented):
-    -- 1. Check Trade Status
-    -- 2. Send Packets / Manipulate Trade
-    
-    StateManager:SetStatus("✅ Dupe sequence initiated (Logic Pending)", THEME.Success, statusLabel)
-    TradeManager.IsProcessing = false
+    task.spawn(function()
+        local data = {
+            MonsterService = {},
+            CratesService = {
+                [baitCrateName] = 10 -- ใส่ 10 ชิ้นตามเงื่อนไขข้อ 3
+            },
+            Currencies = {},
+            PetsService = petPayload, -- Payload สัตว์เลี้ยงจากข้อ 4
+            ItemsService = {},
+            AccessoryService = {}
+        }
+
+        local success, err = pcall(function()
+            return remote:InvokeServer(realTradeId, data)
+        end)
+
+        if success then
+            StateManager:SetStatus("✅ Dupe Success (Evo 2 Applied)!", THEME.Success, statusLabel)
+        else
+            warn("Pet Dupe Error:", err)
+            StateManager:SetStatus("❌ Dupe Failed: Server Error", THEME.Fail, statusLabel)
+        end
+
+        task.wait(1) -- กันสแปม 1 วินาที
+        TradeManager.IsProcessing = false
+    end)
 end
 
 function TradeManager.DeleteSelectedPets(statusLabel, callback)
