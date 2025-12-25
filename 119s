@@ -1529,11 +1529,11 @@ function GUI:UpdateUIState()
         else
             self.DupeWarning.Visible = true
             self.InvContainer.Size = UDim2.new(1, -10, 1, -95)
-            local limitInfo = ""
-            if StateManager.currentDupeTab == "Scrolls" then limitInfo = "SCROLLS LIMIT: 1XX"
-            elseif StateManager.currentDupeTab == "Tickets" then limitInfo = "TICKETS LIMIT: 10,000"
-            elseif StateManager.currentDupeTab == "Potions" then limitInfo = "POTIONS & STRAWBERRY LIMIT: 2,000" end
-            self.DupeWarning.Text = string.format("⚠️ WARNING: Do not exceed limits.\n%s TOTAL.\nRisk of ban if hoarding excessive amounts.", limitInfo)
+            
+            -- ปรับข้อความให้แสดงลิมิตรวมของทุกอย่าง
+            local limitInfo = "SCROLLS: ~150 | TICKETS: 10k | POTIONS: 2k"
+            
+            self.DupeWarning.Text = "⚠️ WARNING: Do not exceed limits.\n" .. limitInfo .. "\nRisk of ban if hoarding excessive amounts."
         end
     end
     
@@ -2009,7 +2009,7 @@ function GUI:RenderCrateGrid()
 end
 
 function GUI:RenderItemDupeGrid()
-    -- 1. ตั้งค่า Grid Layout
+    -- [[ 1. จัดการ Grid Layout ]] --
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -2032,14 +2032,14 @@ function GUI:RenderItemDupeGrid()
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
-    -- 2. วนลูปข้อมูล Items
+    -- [[ 2. วนลูปสร้างการ์ด ]] --
     local recipes = DUPE_RECIPES.Items or {}
     local playerData = InventoryManager.GetPlayerData()
 
     for _, recipe in ipairs(recipes) do
         local serviceName = recipe.Service
         
-        -- เช็คว่ามีของแล้วหรือยัง (Owned)
+        -- 2.1 เช็คว่ามีของชิ้นนี้แล้วหรือยัง (OWNED)
         local isOwned = false
         if playerData and playerData.ItemsService and playerData.ItemsService.Inventory then
             local inv = playerData.ItemsService.Inventory[serviceName]
@@ -2049,7 +2049,7 @@ function GUI:RenderItemDupeGrid()
             end
         end
 
-        -- เช็ควัตถุดิบ (Baits)
+        -- 2.2 เช็ควัตถุดิบ/ตัวล่อ (INGREDIENTS)
         local totalNeeded, foundCount = 0, 0
         local isPotion = (serviceName == "Strawberry" or serviceName:find("Potion"))
         
@@ -2068,9 +2068,10 @@ function GUI:RenderItemDupeGrid()
             end
         end
         
+        -- สถานะพร้อมทำหรือไม่
         local isReady = (not isOwned) and (foundCount >= totalNeeded)
 
-        -- 3. สร้างการ์ด (UI)
+        -- [[ 3. สร้าง UI Card ]] --
         local Card = Instance.new("Frame")
         Card.Name = recipe.Name
         Card.Parent = self.InvContainer
@@ -2078,12 +2079,28 @@ function GUI:RenderItemDupeGrid()
         Card.BackgroundTransparency = 0.1
         UIFactory.AddCorner(Card, 8)
         
-        local strokeColor = Color3.fromRGB(60, 60, 65)
-        if isOwned then strokeColor = THEME.Fail
-        elseif isReady then strokeColor = THEME.DupeReady end
-        UIFactory.AddStroke(Card, strokeColor, 1.5, 0.3)
+        -- [[ 🎨 กำหนดสีตามเงื่อนไข (Stroke Logic) ]] --
+        local statusColor = Color3.fromRGB(60, 60, 65) -- สี Default
+        local statusText = ""
+        
+        if isOwned then
+            -- สีแดง: มีของแล้ว
+            statusColor = THEME.Fail 
+            statusText = "<font color='#ff5555' size='9'>(OWNED)</font>"
+        elseif isReady then
+            -- สีเขียว: พร้อมทำ
+            statusColor = THEME.DupeReady -- หรือ Color3.fromRGB(0, 255, 127)
+            statusText = "<font color='#00ffaa' size='10'>READY</font>"
+        else
+            -- สีเหลือง: ขาดของ (แสดงจำนวนที่หาเจอ/ที่ต้องใช้)
+            statusColor = Color3.fromRGB(255, 200, 50) 
+            statusText = string.format("<font color='#ffcc33' size='9'>Missing: %d/%d</font>", foundCount, totalNeeded)
+        end
+        
+        -- ใส่เส้นขอบตามสีที่กำหนด
+        UIFactory.AddStroke(Card, statusColor, 1.5, 0.3)
 
-        -- ใส่รูปภาพ
+        -- รูปไอเทม
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
@@ -2091,9 +2108,11 @@ function GUI:RenderItemDupeGrid()
         Image.Size = UDim2.new(0, 60, 0, 60)
         Image.Image = "rbxassetid://" .. (recipe.Image or "0")
         Image.ScaleType = Enum.ScaleType.Fit
+        
+        -- ถ้ามีของแล้ว ทำรูปให้มืดลงหน่อย จะได้รู้ว่าไม่ต้องสนใจ
         if isOwned then Image.ImageColor3 = Color3.fromRGB(100, 100, 100) end
 
-        -- ใส่ชื่อและสถานะ
+        -- ชื่อและสถานะใต้รูป
         local NameLbl = Instance.new("TextLabel")
         NameLbl.Parent = Card
         NameLbl.BackgroundTransparency = 1
@@ -2105,18 +2124,13 @@ function GUI:RenderItemDupeGrid()
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
         NameLbl.RichText = true
         
-        if isOwned then
-            NameLbl.Text = recipe.Name .. "\n<font color='#ff5555' size='9'>(OWNED)</font>"
-            NameLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
-        elseif not isReady then
-            NameLbl.Text = recipe.Name .. "\n<font color='#ffaa00' size='9'>Need Baits!</font>"
-            NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
-        else
-            NameLbl.Text = recipe.Name .. "\n<font color='#00ffaa' size='10'>READY</font>"
-            NameLbl.TextColor3 = Color3.new(1,1,1)
-        end
+        -- แสดงชื่อ + สถานะ (สีข้อความตามสถานะ)
+        NameLbl.Text = recipe.Name .. "\n" .. statusText
+        
+        -- ปรับสีชื่อหลักให้จางลงถ้ามีของแล้ว
+        NameLbl.TextColor3 = isOwned and Color3.fromRGB(150, 150, 150) or Color3.new(1,1,1)
 
-        -- ปุ่มกด
+        -- ปุ่มกด (Invisible Button)
         local ClickBtn = Instance.new("TextButton")
         ClickBtn.Parent = Card
         ClickBtn.BackgroundTransparency = 1
@@ -2129,12 +2143,14 @@ function GUI:RenderItemDupeGrid()
                 StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, self.StatusLabel)
                 return
             end
+            
             if isOwned then
                 StateManager:SetStatus("❌ Already Owned!", THEME.Fail, self.StatusLabel)
                 return
             end
+            
             if not isReady then
-                 StateManager:SetStatus("❌ Missing Ingredients!", THEME.Fail, self.StatusLabel)
+                 StateManager:SetStatus("⚠️ Missing Ingredients ("..foundCount.."/"..totalNeeded..")", Color3.fromRGB(255, 200, 50), self.StatusLabel)
                  return
             end
 
