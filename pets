@@ -1518,21 +1518,20 @@ function GUI:RenderPlayersList()
 end
 
 function GUI:RenderPetGallery()
-    -- [[ 1. จัดระเบียบ Layout ใหม่ไม่ให้ทับกัน ]] --
+    -- [[ 1. ล้างข้อมูลเก่าให้เกลี้ยงก่อนเริ่ม ]] --
+    if self.InvFrame:FindFirstChild("PetActionBar") then self.InvFrame.PetActionBar:Destroy() end
     for _, child in pairs(self.InvContainer:GetChildren()) do
         if not child:IsA("UIGridLayout") then child:Destroy() end
     end
-    
-    -- ล้างปุ่ม Dupe เก่าทิ้งก่อนสร้างใหม่
-    if self.InvFrame:FindFirstChild("PetActionBar") then self.InvFrame.PetActionBar:Destroy() end
 
-    -- [[ 2. สร้างแถบปุ่ม Dupe (Action Bar) ไว้บนสุด ]] --
+    -- [[ 2. สร้างแถบปุ่ม Dupe ไว้บนสุด (ตำแหน่ง 0) ]] --
     local ActionBar = Instance.new("Frame")
     ActionBar.Name = "PetActionBar"
     ActionBar.Size = UDim2.new(1, 0, 0, 45)
-    ActionBar.Position = UDim2.new(0, 0, 0, 5) -- ชิดขอบบน
+    ActionBar.Position = UDim2.new(0, 0, 0, 5) -- อยู่บนสุด
     ActionBar.BackgroundTransparency = 1
     ActionBar.Parent = self.InvFrame
+    ActionBar.ZIndex = 10
 
     local selectCount = 0
     for _ in pairs(StateManager.selectedPets) do selectCount = selectCount + 1 end
@@ -1540,36 +1539,34 @@ function GUI:RenderPetGallery()
     UIFactory.CreateButton({
         Size = UDim2.new(0.6, 0, 0, 35),
         Position = UDim2.new(0.2, 0, 0, 5),
-        Text = "🚀 DUPE SELECTED PETS (" .. selectCount .. ")",
-        BgColor = (selectCount > 0) and THEME.BtnDupe or Color3.fromRGB(40, 40, 45),
-        TextColor = (selectCount > 0) and Color3.new(1,1,1) or Color3.fromRGB(120, 120, 125),
+        Text = "🚀 DUPE SELECTED (" .. selectCount .. ")",
+        BgColor = (selectCount > 0) and THEME.BtnDupe or Color3.fromRGB(45, 45, 50),
+        TextColor = (selectCount > 0) and Color3.new(1, 1, 1) or Color3.fromRGB(130, 130, 135),
         CornerRadius = 8,
         Parent = ActionBar,
         OnClick = function()
-            if selectCount == 0 then
-                StateManager:SetStatus("⚠️ Select pets from the list!", THEME.Fail, self.StatusLabel)
-            else
-                print("--- PETS TO DUPE ---")
-                for uuid, _ in pairs(StateManager.selectedPets) do print("ID: " .. uuid) end
-                StateManager:SetStatus("✨ Ready to process " .. selectCount .. " pets", THEME.Success, self.StatusLabel)
+            if selectCount > 0 then
+                print("--- UUID LIST TO DUPE ---")
+                for uuid, _ in pairs(StateManager.selectedPets) do print(uuid) end
+                StateManager:SetStatus("✨ Process " .. selectCount .. " pets", THEME.Success, self.StatusLabel)
             end
         end
     })
 
-    -- [[ 3. ปรับตำแหน่งตารางรายการ (ScrollingFrame) ให้ลงมาด้านล่าง ไม่ให้ทับปุ่ม ]] --
-    self.InvContainer.Position = UDim2.new(0, 5, 0, 55) -- เลื่อนลงมา 55px จากขอบบน
-    self.InvContainer.Size = UDim2.new(1, -10, 1, -65)
+    -- [[ 3. ปรับตารางสัตว์เลี้ยงให้ลงมาด้านล่าง (Position 50) จะได้ไม่ทับปุ่ม ]] --
+    self.InvContainer.Position = UDim2.new(0, 5, 0, 50) -- เริ่มต้นที่ 50 เพื่อหลบปุ่มด้านบน
+    self.InvContainer.Size = UDim2.new(1, -10, 1, -60)
     self.InvContainer.ScrollBarThickness = 2
 
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
     if not layout then
         layout = Instance.new("UIGridLayout", self.InvContainer)
         layout.CellPadding = UDim2.new(0, 10, 0, 10)
-        layout.CellSize = UDim2.new(0, 105, 0, 150) -- เพิ่มความสูงเพื่อโชว์ UUID
+        layout.CellSize = UDim2.new(0, 105, 0, 150) -- ขยายความสูงเพื่อใส่ UUID
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
 
-    -- [[ 4. ดึงข้อมูลจริงจาก PetsService ]] --
+    -- [[ 4. ดึงข้อมูลสัตว์เลี้ยง ]] --
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
     local myPets = (playerData and playerData.PetsService and playerData.PetsService.Pets) or {}
@@ -1579,103 +1576,96 @@ function GUI:RenderPetGallery()
     for uuid, info in pairs(myPets) do
         local pName = (type(info) == "table" and info.Name) or info
         if IsTargetPet(pName) then
-            local isEquipped = false
-            for _, eqUuid in pairs(equippedList) do if eqUuid == uuid then isEquipped = true break end end
+            local isEquip = false
+            for _, eqId in pairs(equippedList) do if eqId == uuid then isEquip = true break end end
             table.insert(petList, {
                 UUID = uuid,
                 Name = pName,
-                Evolution = (type(info) == "table" and info.Evolution) or 0,
-                IsEquipped = isEquipped
+                Evo = (type(info) == "table" and info.Evolution) or 0,
+                Equipped = isEquip
             })
         end
     end
+    table.sort(petList, function(a, b) if a.Equipped ~= b.Equipped then return a.Equipped end return a.Evo > b.Evo end)
 
-    -- เรียงลำดับ: ใส่ตัวที่ Equipped ไว้หน้าสุด
-    table.sort(petList, function(a, b)
-        if a.IsEquipped ~= b.IsEquipped then return a.IsEquipped end
-        return a.Evolution > b.Evolution
-    end)
-
-    -- [[ 5. วาดการ์ด (Card Design ใหม่ คลีนขึ้น) ]] --
+    -- [[ 5. สร้างการ์ด (ไม่มีขอบดำทับรูปแล้ว) ]] --
     for _, pet in ipairs(petList) do
         local isSelected = StateManager.selectedPets[pet.UUID] == true
         
         local Card = Instance.new("TextButton")
         Card.Text = ""
         Card.AutoButtonColor = false
-        Card.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+        Card.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
         Card.Parent = self.InvContainer
         UIFactory.AddCorner(Card, 10)
 
-        -- ขอบ (Stroke)
-        local strokeColor = Color3.fromRGB(50, 50, 60)
-        if pet.IsEquipped then strokeColor = Color3.fromRGB(255, 60, 60)
-        elseif isSelected then strokeColor = Color3.fromRGB(0, 255, 150) end
-        UIFactory.AddStroke(Card, strokeColor, (isSelected or pet.IsEquipped) and 2 or 1, 0.4)
+        -- ขอบตามสถานะ
+        local stroke = UIFactory.AddStroke(Card, Color3.fromRGB(50, 50, 55), 1, 0.4)
+        if pet.Equipped then stroke.Color = Color3.fromRGB(255, 60, 60)
+        elseif isSelected then stroke.Color = Color3.fromRGB(0, 255, 120); stroke.Thickness = 2 end
 
-        -- ดาว (โชว์มุมซ้ายบน เล็กๆ ไม่ทับรูป)
-        if pet.Evolution > 0 then
-            local stars = UIFactory.CreateLabel({
-                Text = string.rep("⭐", pet.Evolution),
+        -- แสดงดาว (Text เล็กๆ มุมซ้าย)
+        if pet.Evo > 0 then
+            local star = UIFactory.CreateLabel({
+                Text = string.rep("⭐", pet.Evo),
                 TextSize = 8,
                 Position = UDim2.new(0, 5, 0, 5),
                 Size = UDim2.new(0, 50, 0, 15),
-                TextColor = Color3.fromRGB(255, 200, 50),
+                TextColor = Color3.fromRGB(255, 220, 50),
                 TextXAlign = Enum.TextXAlignment.Left,
                 Parent = Card
             })
         end
 
-        -- รูปภาพ Pet
+        -- รูปสัตว์เลี้ยง
         local Image = Instance.new("ImageLabel")
         Image.BackgroundTransparency = 1
-        Image.Position = UDim2.new(0, 12, 0, 20) 
-        Image.Size = UDim2.new(0, 80, 0, 80)
+        Image.Position = UDim2.new(0.5, -35, 0, 20)
+        Image.Size = UDim2.new(0, 70, 0, 70)
         Image.ScaleType = Enum.ScaleType.Fit
         Image.Image = (PetsInfo[pet.Name] and PetsInfo[pet.Name].Image) or ""
         Image.Parent = Card
 
-        -- ชื่อ Pet (สีแดงถ้าสวมใส่)
-        local NameLbl = UIFactory.CreateLabel({
+        -- ชื่อ (สีแดงถ้าใส่ชุด)
+        UIFactory.CreateLabel({
             Text = pet.Name,
             TextSize = 10,
             Font = Enum.Font.GothamBold,
-            Position = UDim2.new(0, 5, 0, 100),
+            Position = UDim2.new(0, 5, 0, 95),
             Size = UDim2.new(1, -10, 0, 15),
-            TextColor = pet.IsEquipped and Color3.fromRGB(255, 80, 80) or Color3.new(1,1,1),
+            TextColor = pet.Equipped and Color3.fromRGB(255, 70, 70) or Color3.new(1,1,1),
             Parent = Card
         })
 
-        -- UUID (แสดงรหัสจริงสั้นๆ หรือรหัสเต็ม)
-        local UuidLbl = UIFactory.CreateLabel({
-            Text = "ID: " .. string.sub(pet.UUID, 1, 13) .. "...", -- แสดงแค่ช่วงแรกเพื่อไม่ให้ยาวเกินการ์ด
+        -- แสดงรหัส UUID (สำคัญ)
+        UIFactory.CreateLabel({
+            Text = "UUID: " .. string.sub(pet.UUID, 1, 13) .. "...",
             TextSize = 7,
-            Position = UDim2.new(0, 5, 0, 115),
+            Position = UDim2.new(0, 5, 0, 110),
             Size = UDim2.new(1, -10, 0, 15),
-            TextColor = Color3.fromRGB(140, 140, 150),
+            TextColor = Color3.fromRGB(150, 150, 160),
             Parent = Card
         })
-        
-        -- แท็ก [EQUIPPED]
-        if pet.IsEquipped then
+
+        -- แท็กสถานะ
+        if pet.Equipped then
             UIFactory.CreateLabel({
                 Text = "[EQUIPPED]",
                 TextSize = 8,
                 Font = Enum.Font.GothamBold,
-                Position = UDim2.new(0, 5, 0, 130),
+                Position = UDim2.new(0, 5, 0, 125),
                 Size = UDim2.new(1, -10, 0, 15),
-                TextColor = Color3.fromRGB(255, 80, 80),
+                TextColor = Color3.fromRGB(255, 70, 70),
                 Parent = Card
             })
         end
 
-        -- คลิกเพื่อเลือก (ถ้าไม่สวมใส่)
         Card.MouseButton1Click:Connect(function()
-            if pet.IsEquipped then
-                StateManager:SetStatus("🚫 Unequip " .. pet.Name .. " first!", THEME.Fail, self.StatusLabel)
+            if pet.Equipped then
+                StateManager:SetStatus("🚫 Unequip this pet first!", THEME.Fail, self.StatusLabel)
             else
                 StateManager:TogglePetSelection(pet.UUID)
-                self:RenderPetGallery() -- Refresh UI
+                self:RenderPetGallery()
             end
         end)
     end
