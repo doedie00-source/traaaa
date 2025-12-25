@@ -364,6 +364,7 @@ end
 function StateManager:ResetTrade()
     self.itemsInTrade = {}
     self.selectedCrates = {}
+    self.selectedPets = {} -- [[ ✅ เพิ่มบรรทัดนี้: ล้างสัตว์เลี้ยงที่เลือกเมื่อเทรดจบ/ปิด ]]
 end
 
 function StateManager:AddToTrade(key, itemData)
@@ -401,11 +402,6 @@ function StateManager:TogglePetSelection(uuid)
     else
         self.selectedPets[uuid] = true
     end
-end
-
-function StateManager:ClearSelections()
-    self.selectedPets = {}
-    self.selectedCrates = {}
 end
 
 -- ========================================== --
@@ -1074,7 +1070,10 @@ function GUI:CreateMainTabs(parent)
             CornerRadius = 6,
             Parent = parent,
             OnClick = function()
-                StateManager:ClearSelections() -- [[ เพิ่มตรงนี้: ล้างค่าเมื่อกดเปลี่ยนหน้าหลัก ]]
+                -- [[ ✅ เพิ่ม: ล้างค่าเมื่อเปลี่ยนแท็บหลัก ]]
+                StateManager.selectedPets = {} 
+                StateManager.selectedCrates = {}
+                
                 StateManager.currentMainTab = tab.name
                 self:UpdateUIState()
             end
@@ -1107,7 +1106,10 @@ function GUI:UpdateSubTabs()
             CornerRadius = 6,
             Parent = self.SubMenuFrame,
             OnClick = function()
-                StateManager:ClearSelections() -- [[ เพิ่มตรงนี้: ล้างค่าเมื่อกดสลับ Pets/Crates/Tickets ]]
+                -- [[ ✅ เพิ่ม: ล้างค่าเมื่อเปลี่ยนหน้าย่อย ]]
+                StateManager.selectedPets = {}
+                StateManager.selectedCrates = {}
+
                 if StateManager.currentMainTab == "Trade" then
                     StateManager.currentSubTab = tabName
                 else
@@ -2305,13 +2307,9 @@ function GUI:StartMonitoring()
             end
             if missingCounter > CONFIG.TRADE_RESET_THRESHOLD then
                 TradeManager.IsProcessing = false 
-                -- ตรวจสอบว่ามีการเลือกของค้างไว้ไหม ถ้ามีให้ล้างทิ้ง
-                if next(StateManager.itemsInTrade) ~= nil or next(StateManager.selectedPets) ~= nil then
+                if next(StateManager.itemsInTrade) ~= nil then
                     StateManager:ResetTrade()
-                    StateManager:ClearSelections() -- [[ เพิ่มตรงนี้: ล้างสัตว์เลี้ยงที่เลือกไว้ด้วย ]]
-                    StateManager:SetStatus("Trade closed → Selections Cleared.", THEME.TextGray, self.StatusLabel)
-                    
-                    -- รีเฟรชหน้าจอให้ขอบเขียวหายไป
+                    StateManager:SetStatus("Trade closed → Reset.", THEME.TextGray, self.StatusLabel)
                     self:UpdateTradeViewer()
                     self:RefreshInventory()
                 end
@@ -2324,26 +2322,5 @@ function GUI:StartMonitoring()
 end
 local app = GUI
 app:Initialize()
-
-local TradingRE = game:GetService("ReplicatedStorage").Packages.Knit.Services.TradingService.RE
-local TradeCleanupEvents = {
-    TradingRE.TradeCompleted,
-    TradingRE.TradeCancelled,
-    TradingRE.TradeFailed,
-    TradingRE.TradeFailedFull
-}
-
-for _, event in ipairs(TradeCleanupEvents) do
-    event.OnClientEvent:Connect(function()
-        task.wait(0.1) -- รอระบบประมวลผลแป๊บเดียว
-        StateManager:ClearSelections()
-        StateManager:ResetTrade()
-        if app then
-            app:RefreshInventory()
-            app:UpdateTradeViewer()
-            StateManager:SetStatus("Trade Ended.", THEME.TextGray, app.StatusLabel)
-        end
-    end)
-end
 
 print("✅ Universal Trade V6.6 (Pet Integration) Loaded!")
