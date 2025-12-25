@@ -1329,19 +1329,18 @@ function GUI:UpdateUIState()
         self.SubMenuFrame.Visible = true
         self.TradeFrame.Visible = true
         
-        -- [[ แก้ไขจุดนี้: คำนวณพื้นที่ที่เหลือแล้วแบ่งครึ่ง 50/50 ]] --
-        local sidebarArea = 140 -- พื้นที่แถบซ้าย
-        local padding = 10 -- ระยะห่างขอบและระหว่างกลาง
-        local availableWidth = 850 - sidebarArea - (padding * 3) -- พื้นที่ที่เหลือสำหรับ 2 ตาราง
-        local halfWidth = math.floor(availableWidth / 2)
+        -- [[ แก้ไขแค่ตรงนี้: แบ่งพื้นที่จากจุดเริ่ม 140 ไปจนถึงขอบขวาให้เท่ากัน ]] --
+        -- หน้าต่างกว้าง 850, เริ่มที่ 140, เว้นขอบขวา 10 -> เหลือพื้นที่ 700
+        -- แบ่ง 2 ตาราง ตารางละ 345 และเว้นระยะห่างตรงกลาง 10
+        local frameWidth = 345 
 
-        -- ตารางฝั่งซ้าย (Selection List)
-        self.InvFrame.Position = UDim2.new(0, sidebarArea + padding, 0, 50)
-        self.InvFrame.Size = UDim2.new(0, halfWidth, 1, -80) 
+        -- ตารางซ้าย (Selection) อยู่ที่เดิม (140) แต่ขยายกว้างขึ้นเป็น 345
+        self.InvFrame.Position = UDim2.new(0, 140, 0, 50)
+        self.InvFrame.Size = UDim2.new(0, frameWidth, 1, -80) 
         
-        -- ตารางฝั่งขวา (Current Offer)
-        self.TradeFrame.Position = UDim2.new(0, sidebarArea + halfWidth + (padding * 2), 0, 50)
-        self.TradeFrame.Size = UDim2.new(0, halfWidth, 1, -80) 
+        -- ตารางขวา (Offer) ขยับมาต่อจากตารางซ้ายพอดี (140 + 345 + 10 = 495)
+        self.TradeFrame.Position = UDim2.new(0, 495, 0, 50)
+        self.TradeFrame.Size = UDim2.new(0, frameWidth, 1, -80) 
         
         self.InvHeader.Text = "Selection List (" .. StateManager.currentSubTab .. ")"
         
