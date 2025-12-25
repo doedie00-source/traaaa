@@ -42,8 +42,7 @@ if not SuccessPets then
     PetsInfo = {} 
 end
 
--- เพิ่มตัวแปรเก็บ Pet ที่เลือก (แยกจาก Trade)
-StateManager.selectedPetsForAction = {}
+
 
 -- Cleanup Old GUI
 if CoreGui:FindFirstChild("CleanTradeGUI") then
