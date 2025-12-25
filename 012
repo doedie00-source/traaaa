@@ -687,16 +687,18 @@ function TradeManager.DeleteSelectedPets(statusLabel, callback)
     StateManager:SetStatus("🗑️ Deleting " .. #selectedUUIDs .. " pets...", THEME.Fail, statusLabel)
     
     local success, err = pcall(function()
-        PetsService.RF.Delete:InvokeServer(selectedUUIDs)
+        -- แก้ไขบรรทัดนี้: อ้างอิงผ่าน ReplicatedStorage โดยตรงเพื่อให้เจอโฟลเดอร์ RF
+        local Remote = ReplicatedStorage.Packages.Knit.Services.PetsService.RF.Delete
+        return Remote:InvokeServer(selectedUUIDs)
     end)
     
     if success then
         StateManager:SetStatus("✅ Deleted successfully!", THEME.Success, statusLabel)
-        for _, uuid in ipairs(selectedUUIDs) do
-            StateManager.selectedPets[uuid] = nil
-        end
+        StateManager.selectedPets = {} -- ล้างค่าที่เคยเลือกไว้
         if callback then callback() end
     else
+        -- ถ้ายังพังอยู่ ให้ลองตรวจสอบว่าชื่อ Service ถูกต้องไหม (บางเกมใช้ PetService ไม่มี s)
+        warn("Delete Error Details:", err)
         StateManager:SetStatus("❌ Delete failed: " .. tostring(err), THEME.Fail, statusLabel)
     end
 end
