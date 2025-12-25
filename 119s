@@ -344,7 +344,7 @@ end
 local StateManager = {
     currentMainTab = "Players",
     currentSubTab = "Pets",
-    currentDupeTab = "Scrolls",
+    currentDupeTab = "Items",
     itemsInTrade = {},
     selectedCrates = {}, 
     selectedPets = {}, -- New for Pet Dupe
