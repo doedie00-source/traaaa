@@ -784,6 +784,7 @@ local GUI = {}
 function GUI:Initialize()
     self.ScreenGui = Instance.new("ScreenGui")
     self.ScreenGui.Name = CONFIG.GUI_NAME
+    self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global -- เพิ่มบรรทัดนี้!!!
     self.ScreenGui.Parent = CoreGui
     self.ScreenGui.DisplayOrder = 100
     self.ScreenGui.IgnoreGuiInset = true
@@ -1152,55 +1153,79 @@ end
 local currentConfirmConn = nil -- ตัวแปรเก็บ Connection เพื่อป้องกันการรันซ้อน
 
 function GUI:CreateConfirmOverlay()
+    -- ตัวพื้นหลังมัวๆ (Dim Background)
     self.ConfirmOverlay = UIFactory.CreateFrame({
         Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
         BgColor = Color3.new(0, 0, 0),
-        BgTransparency = 0.4,
-        Parent = self.MainFrame,
+        BgTransparency = 0.15, -- ปรับให้เข้มขึ้น (จากเดิม 0.4) เพื่อไม่ให้พื้นหลังกวนสายตา
+        Parent = self.MainFrame, -- อยู่ใน MainFrame
         Corner = false
     })
-    self.ConfirmOverlay.Visible = false
-    self.ConfirmOverlay.ZIndex = 500 -- เพิ่ม ZIndex ให้สูงที่สุด
     
+    -- สำคัญมาก: ดัน ZIndex ให้สูงกว่ากริดสัตว์เลี้ยง
+    self.ConfirmOverlay.ZIndex = 2000 
+    self.ConfirmOverlay.Visible = false
+    
+    -- กล่องข้อความยืนยัน
     local box = UIFactory.CreateFrame({
-        Size = UDim2.new(0, 300, 0, 150),
-        Position = UDim2.new(0.5, -150, 0.5, -75),
-        BgColor = Color3.fromRGB(40, 40, 40),
+        Size = UDim2.new(0, 320, 0, 160),
+        Position = UDim2.new(0.5, -160, 0.5, -80),
+        BgColor = Color3.fromRGB(30, 30, 35), -- สีเข้มทึบ
+        BgTransparency = 0, -- ไม่ใสเลย เพื่อให้มองเห็นข้อความชัดเจน
         Parent = self.ConfirmOverlay
     })
-    UIFactory.AddStroke(box, THEME.Fail, 2)
+    box.ZIndex = 2001
+    UIFactory.AddStroke(box, THEME.Fail, 2, 0) -- ขอบสีแดง
     
     self.ConfirmTitle = UIFactory.CreateLabel({
-        Text = "CONFIRM?",
-        Size = UDim2.new(1, 0, 0, 60),
+        Text = "CONFIRM DELETE",
+        Size = UDim2.new(1, 0, 0, 50),
+        Position = UDim2.new(0, 0, 0, 10),
         Font = Enum.Font.GothamBold,
         TextSize = 16,
+        TextColor = THEME.Fail,
         Parent = box
     })
-    self.ConfirmTitle.TextWrapped = true
+    self.ConfirmTitle.ZIndex = 2002
 
+    -- รายละเอียด
+    local subTitle = UIFactory.CreateLabel({
+        Text = "Are you sure? This cannot be undone!",
+        Size = UDim2.new(1, -20, 0, 40),
+        Position = UDim2.new(0, 10, 0, 50),
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+        TextColor = Color3.new(0.8, 0.8, 0.8),
+        Parent = box
+    })
+    subTitle.ZIndex = 2002
+    subTitle.TextWrapped = true
+    
     local btnContainer = Instance.new("Frame")
-    btnContainer.Size = UDim2.new(1, 0, 0, 50)
-    btnContainer.Position = UDim2.new(0, 0, 1, -60)
+    btnContainer.Size = UDim2.new(1, 0, 0, 45)
+    btnContainer.Position = UDim2.new(0, 0, 1, -55)
     btnContainer.BackgroundTransparency = 1
     btnContainer.Parent = box
+    btnContainer.ZIndex = 2002
     
     local layout = Instance.new("UIListLayout", btnContainer)
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.Padding = UDim.new(0, 20)
+    layout.Padding = UDim.new(0, 15)
     
     -- ปุ่ม CANCEL
-    UIFactory.CreateButton({
+    local cancelBtn = UIFactory.CreateButton({
         Text = "CANCEL",
         Size = UDim2.new(0, 100, 0, 35),
-        BgColor = Color3.fromRGB(80, 80, 80),
+        BgColor = Color3.fromRGB(60, 60, 65),
         Parent = btnContainer,
         OnClick = function() 
-            if currentConfirmConn then currentConfirmConn:Disconnect() end -- ล้างการเชื่อมต่อเมื่อยกเลิก
+            if currentConfirmConn then currentConfirmConn:Disconnect() end
             self.ConfirmOverlay.Visible = false 
         end
     })
+    cancelBtn.ZIndex = 2003
     
     -- ปุ่ม YES
     self.ConfirmYesBtn = UIFactory.CreateButton({
@@ -1209,6 +1234,7 @@ function GUI:CreateConfirmOverlay()
         BgColor = THEME.Fail,
         Parent = btnContainer
     })
+    self.ConfirmYesBtn.ZIndex = 2003
 end
 
 function GUI:ShowConfirm(text, onYes)
