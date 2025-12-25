@@ -1138,31 +1138,24 @@ function GUI:UpdateUIState()
     self:UpdateSubTabs()
     self.DupeWarning.Visible = false
     
-    -- 1. ล้าง ActionHeader และปุ่มเก่าทิ้งก่อน (ป้องกันการสร้างซ้อน)
+    -- 1. ล้างปุ่มหรือ Header พิเศษที่อาจค้างอยู่ใน InvFrame
     for _, v in pairs(self.InvFrame:GetChildren()) do
-        if v.Name == "PetActionHeader" or v:IsA("TextButton") then 
+        if v.Name == "PetActionHeader" or v.Name == "PetBottomControls" then 
             v:Destroy() 
         end
     end
 
-    -- 2. รีเซ็ต Scrolling Frame ให้เป็น List Layout มาตรฐานก่อน
-    if self.InvContainer:FindFirstChild("UIGridLayout") then
-        self.InvContainer:ClearAllChildren()
-        local layout = Instance.new("UIListLayout", self.InvContainer)
-        layout.Padding = UDim.new(0, CONFIG.LIST_PADDING)
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    end
-
-    -- 3. ตั้งค่าตำแหน่งเริ่มต้น (แบบมาตรฐานสำหรับหน้า Players/Trade)
+    -- 2. ตั้งค่าขนาด ScrollingFrame มาตรฐาน
+    -- ปรับ Position ให้เริ่มที่เดิม (35) แต่ลดความสูง (Size) ลงเหลือ -90 เพื่อเว้นที่ว่างด้านล่าง 50px
     self.InvContainer.Position = UDim2.new(0, 5, 0, 35)
-    self.InvContainer.Size = UDim2.new(1, -10, 1, -40)
+    self.InvContainer.Size = UDim2.new(1, -10, 1, -90) 
 
-    -- 4. จัดการ Layout ตาม Tab ที่เลือก
     if StateManager.currentMainTab == "Players" then
         self.SubMenuFrame.Visible = false
         self.TradeFrame.Visible = false
         self.InvFrame.Size = UDim2.new(1, -150, 1, -80) 
         self.InvHeader.Text = "  Server Players (Force Trade)"
+        self.InvContainer.Size = UDim2.new(1, -10, 1, -40) -- หน้าอื่นใช้ขนาดเต็มปกติ
         
     elseif StateManager.currentMainTab == "Trade" then
         self.SubMenuFrame.Visible = true
@@ -1171,6 +1164,7 @@ function GUI:UpdateUIState()
         self.TradeFrame.Position = UDim2.new(0, 140 + 320 + 10, 0, 50)
         self.TradeFrame.Size = UDim2.new(0, 320, 1, -80) 
         self.InvHeader.Text = "  Selection List (" .. StateManager.currentSubTab .. ")"
+        self.InvContainer.Size = UDim2.new(1, -10, 1, -40)
         
     elseif StateManager.currentMainTab == "Dupe" then
         self.SubMenuFrame.Visible = true
@@ -1178,14 +1172,11 @@ function GUI:UpdateUIState()
         self.InvFrame.Size = UDim2.new(1, -150, 1, -80)
         self.InvHeader.Text = "  ✨ Magic Dupe (" .. StateManager.currentDupeTab .. ")"
         
-        -- [[ 🎯 จุดแก้ไข: เว้นที่ว่างให้ปุ่ม DUPE/DELETE ในหน้า Pets ]]
-        if StateManager.currentDupeTab == "Pets" then
-            -- เลื่อนส่วนแสดงสัตว์เลี้ยงลงมา (เริ่มที่ Y=75) และลดความสูงลงไม่ให้ล้นขอบล่าง
-            self.InvContainer.Position = UDim2.new(0, 5, 0, 75) 
-            self.InvContainer.Size = UDim2.new(1, -10, 1, -85)
+        -- ถ้าไม่ใช่หน้า Pets ให้กลับไปใช้ขนาดเต็ม
+        if StateManager.currentDupeTab ~= "Pets" then
+            self.InvContainer.Size = UDim2.new(1, -10, 1, -40)
         end
 
-        -- จัดการคำเตือน (Warning)
         if StateManager.currentDupeTab ~= "Crates" and StateManager.currentDupeTab ~= "Pets" then
             self.DupeWarning.Visible = true
             self.InvContainer.Size = UDim2.new(1, -10, 1, -110)
@@ -1197,7 +1188,7 @@ function GUI:UpdateUIState()
         end
     end
     
-    -- อัปเดตสีปุ่ม Tab หลัก
+    -- อัปเดตสถานะปุ่มเมนูหลัก
     for name, btn in pairs(self.MainTabButtons) do
         local isSelected = (name == StateManager.currentMainTab)
         btn.BackgroundColor3 = isSelected and THEME.BtnMainTabSelected or THEME.BtnMainTab
@@ -1232,7 +1223,7 @@ function GUI:RefreshInventory()
 end
 
 function GUI:RenderPetGalleryV7()
-    -- 1. ล้างข้อมูลเก่าและตั้งค่า Grid
+    -- 1. เตรียม Layout แบบตาราง (Grid)
     for _, child in pairs(self.InvContainer:GetChildren()) do
         if not child:IsA("UIListLayout") and not child:IsA("UIGridLayout") then child:Destroy() end
     end
@@ -1241,7 +1232,7 @@ function GUI:RenderPetGalleryV7()
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
     if not layout then
         layout = Instance.new("UIGridLayout", self.InvContainer)
-        layout.CellPadding = UDim2.new(0, 8, 0, 8)
+        layout.CellPadding = UDim2.new(0, 10, 0, 10)
         layout.CellSize = UDim2.new(0, 100, 0, 135)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -1249,46 +1240,47 @@ function GUI:RenderPetGalleryV7()
     self.InvContainer.ScrollBarThickness = 2
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
-    -- 2. สร้างแถบ ActionHeader (แยกออกจาก Scroll)
-    -- แถบนี้จะอยู่ด้านบนของ Scroll ตลอดเวลา
-    local ActionHeader = Instance.new("Frame")
-    ActionHeader.Name = "PetActionHeader"
-    ActionHeader.Size = UDim2.new(1, -20, 0, 35)
-    ActionHeader.Position = UDim2.new(0, 10, 0, 35) -- ตำแหน่งใต้ชื่อหัวข้อพอดี
-    ActionHeader.BackgroundTransparency = 1
-    ActionHeader.Parent = self.InvFrame
+    -- 2. สร้างกลุ่มปุ่มควบคุมที่ "มุมล่างขวา"
+    local BottomControls = Instance.new("Frame")
+    BottomControls.Name = "PetBottomControls"
+    BottomControls.Size = UDim2.new(0, 210, 0, 40)
+    BottomControls.Position = UDim2.new(1, -10, 1, -10) -- ชิดขอบล่างและขวา
+    BottomControls.AnchorPoint = Vector2.new(1, 1) -- จุดหมุนอยู่ที่มุมล่างขวา
+    BottomControls.BackgroundTransparency = 1
+    BottomControls.ZIndex = 100 -- ให้อยู่เหนือรูปสัตว์เลี้ยง
+    BottomControls.Parent = self.InvFrame
 
     local function getSelectedCount()
         local c = 0 for _ in pairs(StateManager.selectedPetsForDupe) do c = c + 1 end return c
     end
 
-    -- [[ 🎯 ปุ่ม DUPE: วางชิดขวาของ ActionHeader ]]
+    -- [[ ปุ่ม DUPE ]] อยู่ขวาสุด
     local DupeBtn = UIFactory.CreateButton({
-        Size = UDim2.new(0, 85, 0, 30),
-        Position = UDim2.new(1, 0, 0.5, 0), -- ชิดขวา
-        AnchorPoint = Vector2.new(1, 0.5), -- จุดหมุนอยู่ขวากลาง
+        Size = UDim2.new(0, 90, 0, 32),
+        Position = UDim2.new(1, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(1, 0.5),
         Text = "DUPE",
         BgColor = THEME.BtnDupe,
-        Parent = ActionHeader,
+        Parent = BottomControls,
         OnClick = function()
             if getSelectedCount() == 0 then
                 StateManager:SetStatus("⚠️ Select pets first!", THEME.Fail, self.StatusLabel)
                 return
             end
-            StateManager:SetStatus("✨ Ready to Dupe " .. getSelectedCount() .. " pets!", THEME.BtnDupe, self.StatusLabel)
-            -- ใส่โค้ด Execute Dupe ต่อที่นี่
+            StateManager:SetStatus("🚀 Execution Started...", THEME.BtnDupe, self.StatusLabel)
+            -- ใส่โค้ดทำงานของคุณที่นี่
         end
     })
 
-    -- [[ 🎯 ปุ่ม DELETE: วางถัดจากปุ่ม DUPE มาทางซ้าย ]]
+    -- [[ ปุ่ม DELETE ]] อยู่ซ้ายของปุ่ม DUPE
     local currentCount = Utils.CountTable(StateManager.selectedPetsForDupe)
     local DeleteBtn = UIFactory.CreateButton({
-        Size = UDim2.new(0, 100, 0, 30),
-        Position = UDim2.new(1, -90, 0.5, 0), -- เว้นระยะห่างจากปุ่ม DUPE
+        Size = UDim2.new(0, 110, 0, 32),
+        Position = UDim2.new(1, -95, 0.5, 0),
         AnchorPoint = Vector2.new(1, 0.5),
         Text = "DELETE (" .. currentCount .. ")",
         BgColor = THEME.ItemEquip,
-        Parent = ActionHeader,
+        Parent = BottomControls,
         OnClick = function()
             local count = Utils.CountTable(StateManager.selectedPetsForDupe)
             if count == 0 then 
@@ -1300,21 +1292,21 @@ function GUI:RenderPetGalleryV7()
             for id, _ in pairs(StateManager.selectedPetsForDupe) do table.insert(uuids, id) end
             
             local success, DeleteRemote = pcall(function()
-                return ReplicatedStorage.Packages.Knit.Services.PetsService.RF.Delete
+                return game:GetService("ReplicatedStorage").Packages.Knit.Services.PetsService.RF.Delete
             end)
             
             if success and DeleteRemote then
                 DeleteRemote:InvokeServer(uuids)
                 StateManager.selectedPetsForDupe = {}
                 self:RefreshInventory()
-                StateManager:SetStatus("✅ Successfully deleted " .. count .. " pets", THEME.Success, self.StatusLabel)
+                StateManager:SetStatus("✅ Deleted " .. count .. " pets", THEME.Success, self.StatusLabel)
             else
-                StateManager:SetStatus("❌ Remote Error!", THEME.Fail, self.StatusLabel)
+                StateManager:SetStatus("❌ Delete Error!", THEME.Fail, self.StatusLabel)
             end
         end
     })
 
-    -- 3. ดึงและประมวลผลข้อมูลสัตว์เลี้ยง
+    -- 3. ดึงข้อมูลสัตว์เลี้ยงมาแสดง
     local replica = ReplicaListener:GetReplica()
     if not (replica and replica.Data.PetsService) then return end
     
@@ -1322,6 +1314,7 @@ function GUI:RenderPetGalleryV7()
     local equipped = replica.Data.PetsService.EquippedPets or {}
     local eqMap = {} for _, v in pairs(equipped) do eqMap[v] = true end
 
+    -- เรียงลำดับ
     local sorted = {}
     for uuid, data in pairs(myPets) do data.UUID = uuid table.insert(sorted, data) end
     table.sort(sorted, function(a, b)
@@ -1330,7 +1323,7 @@ function GUI:RenderPetGalleryV7()
         return (a.Name or "") < (b.Name or "")
     end)
 
-    -- 4. วนลูปสร้างการ์ดสัตว์เลี้ยงใน Grid
+    -- 4. วาดการ์ดสัตว์เลี้ยงลงใน Grid
     for _, petData in ipairs(sorted) do
         local uuid = petData.UUID
         local petName = petData.Name or "Unknown"
@@ -1345,7 +1338,6 @@ function GUI:RenderPetGalleryV7()
         Card.Parent = self.InvContainer
         UIFactory.AddCorner(Card, 6)
         
-        -- เส้นขอบแสดงสถานะ
         local stroke = Instance.new("UIStroke", Card)
         stroke.Thickness = 2
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -1359,7 +1351,6 @@ function GUI:RenderPetGalleryV7()
             stroke.Enabled = false 
         end
 
-        -- รูปภาพ
         local img = Instance.new("ImageLabel", Card)
         img.Size = UDim2.new(0, 65, 0, 65)
         img.Position = UDim2.new(0.5, -32.5, 0, 15)
@@ -1367,7 +1358,6 @@ function GUI:RenderPetGalleryV7()
         if PetsInfo[petName] then img.Image = "rbxassetid://" .. tostring(PetsInfo[petName].Image) end
         img.ScaleType = Enum.ScaleType.Fit
 
-        -- ชื่อ
         local nameLbl = Instance.new("TextLabel", Card)
         nameLbl.Text = petName
         nameLbl.Size = UDim2.new(1, -4, 0, 20)
@@ -1377,7 +1367,6 @@ function GUI:RenderPetGalleryV7()
         nameLbl.Font = Enum.Font.GothamBold
         nameLbl.TextSize = 10
 
-        -- ป้าย EQUIPPED
         if isEquipped then
             local eq = Instance.new("TextLabel", Card)
             eq.Text = "EQUIP"
@@ -1389,7 +1378,6 @@ function GUI:RenderPetGalleryV7()
             eq.BackgroundTransparency = 1
         end
 
-        -- แสดงรหัส UUID สั้นๆ
         local idLbl = Instance.new("TextLabel", Card)
         idLbl.Text = uuid:sub(1, 6) .. ".."
         idLbl.Size = UDim2.new(1, -10, 0, 16)
@@ -1400,7 +1388,6 @@ function GUI:RenderPetGalleryV7()
         idLbl.TextSize = 8
         UIFactory.AddCorner(idLbl, 4)
 
-        -- ปุ่มสำหรับคลิกเลือกสัตว์เลี้ยง
         local click = Instance.new("TextButton", Card)
         click.Size = UDim2.new(1, 0, 1, 0)
         click.BackgroundTransparency = 1
@@ -1408,7 +1395,7 @@ function GUI:RenderPetGalleryV7()
         click.ZIndex = 10
         click.MouseButton1Click:Connect(function()
             if isLocked then 
-                StateManager:SetStatus("🚫 Cannot select Equipped pets!", THEME.Fail, self.StatusLabel)
+                StateManager:SetStatus("🚫 Locked: Equipped or Evo 2+", THEME.Fail, self.StatusLabel)
                 return 
             end
             if StateManager.selectedPetsForDupe[uuid] then
