@@ -40,7 +40,7 @@ if not SuccessPets then PetsInfo = {} end
 
 -- รายชื่อสัตว์ที่ต้องการให้โชว์ (แก้ชื่อตรงนี้ได้เลย)
 local TARGET_PETS_LIST = {
-    "Meowrrior", "Batkin", "Xmastree", "Malame", "Meowl", "Medus"
+    "Meowrrior", "Batkin", "Xmastree", "Malame", "Meowl", "Medus", "Dog"
 }
 
 -- ฟังชั่นเช็คชื่อสัตว์
