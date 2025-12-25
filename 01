@@ -1106,54 +1106,75 @@ function GUI:CreateRightPanel()
 end
 
 function GUI:CreatePopup()
+    -- แผ่นใสๆ ดำๆ ที่บังทั้งหน้าจอเวลา Popup เด้ง
     self.PopupFrame = UIFactory.CreateFrame({
         Size = UDim2.new(1, 0, 1, 0),
         BgColor = Color3.new(0, 0, 0),
-        BgTransparency = 0.85,
+        BgTransparency = 0.4, -- มืดลงนิดหน่อยเพื่อให้กล่องตรงกลางเด่น
         Parent = self.MainFrame,
         Corner = false
     })
     self.PopupFrame.Visible = false
-    self.PopupFrame.ZIndex = 200
+    self.PopupFrame.ZIndex = 3000 -- ตั้งให้สูงกว่า Confirm Delete
     
+    -- ตัวกล่องใส่จำนวน (ตรงกลาง)
     local popupBox = UIFactory.CreateFrame({
-        Size = UDim2.new(0, 200, 0, 120),
-        Position = UDim2.new(0.5, -100, 0.5, -60),
-        BgColor = THEME.MainBg,
-        BgTransparency = 0.1,
+        Size = UDim2.new(0, 240, 0, 150),
+        Position = UDim2.new(0.5, -120, 0.5, -75),
+        BgColor = Color3.fromRGB(30, 30, 35), -- สีทึบ ไม่โปร่งแสง
+        BgTransparency = 0, -- [[ แก้จุดนี้: ปรับเป็น 0 เพื่อให้ทึบสนิท ]]
         Parent = self.PopupFrame,
         CornerRadius = 8
     })
-    UIFactory.AddStroke(popupBox, THEME.BtnSelected, 1, 0.3)
+    popupBox.ZIndex = 3001
+    UIFactory.AddStroke(popupBox, THEME.BtnSelected, 2, 0) -- ขอบสีฟ้าทึบๆ
     
+    UIFactory.CreateLabel({
+        Text = "ENTER AMOUNT",
+        Size = UDim2.new(1, 0, 0, 40),
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        TextColor = Color3.new(1, 1, 1),
+        Parent = popupBox
+    }).ZIndex = 3002
+    
+    -- ช่องกรอกตัวเลข
     self.PopupInput = Instance.new("TextBox")
-    self.PopupInput.Size = UDim2.new(0.8, 0, 0, 30)
-    self.PopupInput.Position = UDim2.new(0.1, 0, 0.3, 0)
-    self.PopupInput.Text = "1"
+    self.PopupInput.Size = UDim2.new(0.8, 0, 0, 35)
+    self.PopupInput.Position = UDim2.new(0.1, 0, 0.35, 0)
+    self.PopupInput.Text = "1000"
     self.PopupInput.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-    self.PopupInput.BackgroundTransparency = 0.5
+    self.PopupInput.BackgroundTransparency = 0 -- ทึบสนิท
     self.PopupInput.TextColor3 = Color3.new(1, 1, 1)
+    self.PopupInput.Font = Enum.Font.Code
+    self.PopupInput.TextSize = 18
+    self.PopupInput.ClearTextOnFocus = false
     self.PopupInput.Parent = popupBox
+    self.PopupInput.ZIndex = 3002
     UIFactory.AddCorner(self.PopupInput, 4)
+    UIFactory.AddStroke(self.PopupInput, Color3.fromRGB(80, 80, 80), 1, 0)
     
+    -- ปุ่ม Confirm
     self.PopupConfirm = UIFactory.CreateButton({
-        Size = UDim2.new(0.8, 0, 0, 30),
-        Position = UDim2.new(0.1, 0, 0.65, 0),
-        Text = "Confirm",
+        Size = UDim2.new(0.8, 0, 0, 35),
+        Position = UDim2.new(0.1, 0, 0.7, 0),
+        Text = "CONFIRM",
         BgColor = THEME.BtnSelected,
-        CornerRadius = 4,
+        CornerRadius = 6,
         Parent = popupBox
     })
+    self.PopupConfirm.ZIndex = 3002
     
+    -- ปุ่มปิด (X)
     UIFactory.CreateButton({
-        Size = UDim2.new(0, 20, 0, 20),
-        Position = UDim2.new(1, -25, 0, 5),
+        Size = UDim2.new(0, 25, 0, 25),
+        Position = UDim2.new(1, -30, 0, 5),
         Text = "X",
         BgColor = THEME.ItemEquip,
         CornerRadius = 4,
         Parent = popupBox,
         OnClick = function() self.PopupFrame.Visible = false end
-    })
+    }).ZIndex = 3002
 end
 
 local currentConfirmConn = nil -- ตัวแปรเก็บ Connection เพื่อป้องกันการรันซ้อน
