@@ -7,7 +7,7 @@
 -- 3. คนคอมเฟริมคนแรกต้องเป็นคนcancel
 
 -- 4 ใช้ตัวรับส่งหา ตัว dupe ละเทรดเปล่าๆอีกที
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/doedie00-source/trades/refs/heads/main/65dupecrates"))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/doedie00-source/trades/refs/heads/main/65dupecrates"))() --
 -- ========================================== --
 -- 📦 Services & Dependencies
 -- ========================================== --
