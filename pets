@@ -40,7 +40,7 @@ if not SuccessPets then PetsInfo = {} end
 
 -- รายชื่อสัตว์ที่ต้องการให้โชว์ (แก้ชื่อตรงนี้ได้เลย)
 local TARGET_PETS_LIST = {
-    "Meowrrior", "Batkin", "Xmastree", "Malame", "Meowl", "Medus", "Dog"
+    "Meowrrior", "Batkin", "Xmastree", "Malame", "Meowl", "Medus"
 }
 
 -- ฟังชั่นเช็คชื่อสัตว์
@@ -1530,7 +1530,7 @@ function GUI:RenderPetGallery()
     if not layout then
         layout = Instance.new("UIGridLayout", self.InvContainer)
         layout.CellPadding = UDim2.new(0, 8, 0, 8)
-        layout.CellSize = UDim2.new(0, 95, 0, 130) -- ขนาดการ์ด
+        layout.CellSize = UDim2.new(0, 95, 0, 130)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
@@ -1539,26 +1539,19 @@ function GUI:RenderPetGallery()
     local selectCount = 0
     for _ in pairs(StateManager.selectedPets) do selectCount = selectCount + 1 end
 
-    -- 3. สร้างปุ่ม Action Bar (ปุ่ม Dupe) ไว้ด้านบนสุด
-    -- เราใช้ Hack นิดหน่อยโดยสร้าง Frame เปล่าๆ มาดัน Grid ลง แล้วเอาปุ่มแปะที่ InvFrame
-    
-    -- ล้างปุ่มเก่าถ้ามี
+    -- 3. สร้างปุ่ม Action Bar (ปุ่ม Dupe)
     if self.InvFrame:FindFirstChild("PetActionBar") then self.InvFrame.PetActionBar:Destroy() end
     
     local ActionBar = Instance.new("Frame")
     ActionBar.Name = "PetActionBar"
     ActionBar.Size = UDim2.new(1, 0, 0, 40)
-    ActionBar.Position = UDim2.new(0, 0, 0, 30) -- วางทับด้านบน
+    ActionBar.Position = UDim2.new(0, 0, 0, 30)
     ActionBar.BackgroundTransparency = 1
     ActionBar.Parent = self.InvFrame
     ActionBar.ZIndex = 10
 
-    -- ปรับ ScrollView หลบปุ่ม
     self.InvContainer.Position = UDim2.new(0, 5, 0, 30) 
     self.InvContainer.Size = UDim2.new(1, -10, 1, -35)
-    
-    -- ลบปุ่ม Dupe Pet ทิ้งถ้าเปลี่ยนหน้า
-    if self.InvFrame:FindFirstChild("PetActionBar") then self.InvFrame.PetActionBar:Destroy() end
 
     UIFactory.CreateButton({
         Size = UDim2.new(0.5, 0, 0, 30),
@@ -1572,43 +1565,51 @@ function GUI:RenderPetGallery()
             if selectCount == 0 then
                 StateManager:SetStatus("⚠️ Select pets first!", THEME.Fail, self.StatusLabel)
             else
-                -- [[ LOGIC ที่คุณจะใส่ทีหลัง ]] --
                 print("UUIDs to Dupe:", StateManager.selectedPets)
-                StateManager:SetStatus("✨ Selected " .. selectCount .. " pets. Ready for Logic.", THEME.Success, self.StatusLabel)
+                StateManager:SetStatus("✨ Ready to Dupe " .. selectCount .. " pets.", THEME.Success, self.StatusLabel)
             end
         end
     })
 
-    -- 4. ดึงข้อมูล Pet
+    -- 4. ดึงข้อมูล Pet (ดึงจาก PetsService ตามจริง)
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
     local myPets = (playerData and playerData.PetsService and playerData.PetsService.Pets) or {}
+    local equippedList = (playerData and playerData.PetsService and playerData.PetsService.EquippedPets) or {}
 
     local petList = {}
     for uuid, info in pairs(myPets) do
         local pName = (type(info) == "table" and info.Name) or info
         
-        -- กรองเฉพาะชื่อที่ต้องการ
+        -- กรองเฉพาะตัวที่อยู่ในลิสต์เป้าหมาย
         if IsTargetPet(pName) then
+            -- เช็คว่าตัวนี้สวมใส่อยู่หรือไม่
+            local isEquipped = false
+            for _, eqUuid in pairs(equippedList) do
+                if eqUuid == uuid then isEquipped = true; break end
+            end
+
             local evo = (type(info) == "table" and info.Evolution) or 0
             table.insert(petList, {
                 UUID = uuid,
                 Name = pName,
                 Evolution = tonumber(evo) or 0,
+                IsEquipped = isEquipped,
                 RawInfo = info
             })
         end
     end
 
-    -- เรียงลำดับ: Evo มากไปน้อย -> ชื่อ
+    -- เรียงลำดับ: ตัวที่ใส่อยู่ขึ้นก่อน -> Evo มากไปน้อย -> ชื่อ
     table.sort(petList, function(a, b)
+        if a.IsEquipped ~= b.IsEquipped then return a.IsEquipped end
         if a.Evolution ~= b.Evolution then return a.Evolution > b.Evolution end
         return a.Name < b.Name
     end)
 
     if #petList == 0 then
         local lbl = UIFactory.CreateLabel({
-            Text = "No target pets found in inventory.",
+            Text = "No target pets found.",
             TextColor = THEME.TextGray,
             Parent = self.InvContainer
         })
@@ -1627,9 +1628,14 @@ function GUI:RenderPetGallery()
         Card.Parent = self.InvContainer
         UIFactory.AddCorner(Card, 8)
 
-        -- เส้นขอบ (เขียวถ้าเลือก / เทาถ้าไม่เลือก)
-        local strokeColor = isSelected and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(60, 60, 70)
-        UIFactory.AddStroke(Card, strokeColor, isSelected and 2 or 1, 0.5)
+        -- สีขอบ: แดง(ใส่ชุด) / เขียว(เลือก) / เทา(ปกติ)
+        local strokeColor = Color3.fromRGB(60, 60, 70)
+        if pet.IsEquipped then
+            strokeColor = Color3.fromRGB(255, 80, 80) -- สีแดงบอกว่าใส่อยู่
+        elseif isSelected then
+            strokeColor = Color3.fromRGB(0, 255, 100) -- สีเขียวบอกว่าเลือกอยู่
+        end
+        UIFactory.AddStroke(Card, strokeColor, (isSelected or pet.IsEquipped) and 2 or 1, 0.5)
 
         -- ส่วนหัวแสดงดาว
         local Header = Instance.new("Frame")
@@ -1649,14 +1655,14 @@ function GUI:RenderPetGallery()
         starLbl.Font = Enum.Font.GothamBold
         starLbl.Parent = Header
 
-        -- รูปภาพ (ใช้ PetsInfo)
+        -- รูปภาพ
         local Image = Instance.new("ImageLabel")
         Image.BackgroundTransparency = 1
         Image.Position = UDim2.new(0.5, -30, 0, 25) 
         Image.Size = UDim2.new(0, 60, 0, 60)
         Image.ScaleType = Enum.ScaleType.Fit
         Image.Parent = Card
-
+        
         local imgId = "0"
         if PetsInfo[pet.Name] and PetsInfo[pet.Name].Image then
             imgId = PetsInfo[pet.Name].Image
@@ -1664,27 +1670,29 @@ function GUI:RenderPetGallery()
         if not tostring(imgId):find("rbxassetid://") then imgId = "rbxassetid://" .. imgId end
         Image.Image = imgId
 
-        -- ชื่อ Pet
+        -- ชื่อ Pet + แท็ก Equipped
         local NameLbl = Instance.new("TextLabel")
         NameLbl.BackgroundTransparency = 1
-        NameLbl.Position = UDim2.new(0, 2, 1, -35) 
-        NameLbl.Size = UDim2.new(1, -4, 0, 30)
+        NameLbl.Position = UDim2.new(0, 2, 1, -40) 
+        NameLbl.Size = UDim2.new(1, -4, 0, 35)
         NameLbl.Font = Enum.Font.GothamBold
-        NameLbl.Text = pet.Name
-        NameLbl.TextColor3 = isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
-        NameLbl.TextSize = 10
+        NameLbl.Text = pet.Name .. (pet.IsEquipped and "\n[EQUIPPED]" or "")
+        NameLbl.TextColor3 = pet.IsEquipped and Color3.fromRGB(255, 100, 100) or (isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180))
+        NameLbl.TextSize = 9
         NameLbl.TextWrapped = true
-        NameLbl.TextYAlignment = Enum.TextYAlignment.Center
         NameLbl.Parent = Card
 
         -- Logic การกดเลือก
         Card.MouseButton1Click:Connect(function()
+            if pet.IsEquipped then
+                StateManager:SetStatus("🚫 Cannot select equipped pet!", THEME.Fail, self.StatusLabel)
+                return
+            end
             StateManager:TogglePetSelection(pet.UUID)
-            self:RenderPetGallery() -- รีเฟรชเพื่ออัพเดทสีกรอบและตัวเลขที่ปุ่ม
+            self:RenderPetGallery()
         end)
     end
 end
-
 function GUI:RenderTradeItems()
     local playerData = InventoryManager.GetPlayerData()
     if not playerData then return end
