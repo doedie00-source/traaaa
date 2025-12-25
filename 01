@@ -679,26 +679,23 @@ function TradeManager.DeleteSelectedPets(statusLabel, callback)
         if selected then table.insert(selectedUUIDs, uuid) end
     end
     
-    if #selectedUUIDs == 0 then
-        StateManager:SetStatus("⚠️ Select pets to delete first!", THEME.Fail, statusLabel)
-        return
-    end
+    if #selectedUUIDs == 0 then return end
 
-    StateManager:SetStatus("🗑️ Deleting " .. #selectedUUIDs .. " pets...", THEME.Fail, statusLabel)
+    StateManager:SetStatus("🗑️ Deleting pets...", THEME.Fail, statusLabel)
     
     local success, err = pcall(function()
-        -- แก้ไขบรรทัดนี้: อ้างอิงผ่าน ReplicatedStorage โดยตรงเพื่อให้เจอโฟลเดอร์ RF
         local Remote = ReplicatedStorage.Packages.Knit.Services.PetsService.RF.Delete
         return Remote:InvokeServer(selectedUUIDs)
     end)
     
     if success then
+        -- [[ แก้จุดนี้: ล้างรายการที่เลือกให้หมดทันที ]]
+        StateManager.selectedPets = {} 
         StateManager:SetStatus("✅ Deleted successfully!", THEME.Success, statusLabel)
-        StateManager.selectedPets = {} -- ล้างค่าที่เคยเลือกไว้
+        
+        -- ส่ง Callback กลับไป
         if callback then callback() end
     else
-        -- ถ้ายังพังอยู่ ให้ลองตรวจสอบว่าชื่อ Service ถูกต้องไหม (บางเกมใช้ PetService ไม่มี s)
-        warn("Delete Error Details:", err)
         StateManager:SetStatus("❌ Delete failed: " .. tostring(err), THEME.Fail, statusLabel)
     end
 end
@@ -1047,7 +1044,8 @@ function GUI:CreateCenterPanel()
 
             self:ShowConfirm("Are you sure you want to delete " .. selectedCount .. " pets?\nThis cannot be undone!", function()
                 TradeManager.DeleteSelectedPets(self.StatusLabel, function()
-                    -- ล้างตารางที่เลือกและรีเฟรชหน้าจอ
+                    -- [[ แก้จุดนี้: รอให้ระบบหลังบ้านอัปเดตข้อมูลสักครู่ก่อน Refresh ]]
+                    task.wait(0.5) -- เพิ่มการรอ 0.5 วินาที
                     StateManager.selectedPets = {} 
                     self:RefreshInventory()
                 end)
@@ -1399,8 +1397,11 @@ function GUI:UpdateUIState()
 end
 
 function GUI:RefreshInventory()
+    -- [[ บรรทัดนี้ต้องมี เพื่อล้างรูปสัตว์เลี้ยงอันเก่าทิ้งก่อนวาดใหม่ ]]
     for _, child in pairs(self.InvContainer:GetChildren()) do
-        if not child:IsA("UIListLayout") and not child:IsA("UIGridLayout") then child:Destroy() end
+        if not child:IsA("UIListLayout") and not child:IsA("UIGridLayout") and not child:IsA("UIPadding") then 
+            child:Destroy() 
+        end
     end
     
     if StateManager.currentMainTab == "Players" then
