@@ -1081,7 +1081,8 @@ end
 
 function GUI:CreateRightPanel()
     self.TradeFrame = UIFactory.CreateFrame({
-        Size = UDim2.new(0.35, 0, 1, -80),
+        -- เปลี่ยนเป็น Size เต็มพื้นที่ของ Parent (เพื่อให้ขยายตามที่เราตั้งไว้ใน UpdateUIState)
+        Size = UDim2.new(1, 0, 1, 0), 
         Parent = self.MainFrame
     })
     self.TradeFrame.Visible = false
@@ -1095,8 +1096,11 @@ function GUI:CreateRightPanel()
         Parent = self.TradeFrame
     })
     
-    self.TradeContainer, _ = UIFactory.CreateScrollingFrame({
+    self.TradeContainer = UIFactory.CreateScrollingFrame({
         Parent = self.TradeFrame,
+        -- ให้ ScrollContainer ขยายเต็มพื้นที่ตารางฝั่งขวา
+        Size = UDim2.new(1, -10, 1, -35),
+        Position = UDim2.new(0, 5, 0, 30),
         ScrollBarThickness = 0
     })
 end
@@ -1324,9 +1328,21 @@ function GUI:UpdateUIState()
     elseif StateManager.currentMainTab == "Trade" then
         self.SubMenuFrame.Visible = true
         self.TradeFrame.Visible = true
-        self.InvFrame.Size = UDim2.new(0, 320, 1, -80) 
-        self.TradeFrame.Position = UDim2.new(0, 140 + 320 + 10, 0, 50)
-        self.TradeFrame.Size = UDim2.new(0, 320, 1, -80) 
+        
+        -- [[ แก้ไขจุดนี้: คำนวณพื้นที่ที่เหลือแล้วแบ่งครึ่ง 50/50 ]] --
+        local sidebarArea = 140 -- พื้นที่แถบซ้าย
+        local padding = 10 -- ระยะห่างขอบและระหว่างกลาง
+        local availableWidth = 850 - sidebarArea - (padding * 3) -- พื้นที่ที่เหลือสำหรับ 2 ตาราง
+        local halfWidth = math.floor(availableWidth / 2)
+
+        -- ตารางฝั่งซ้าย (Selection List)
+        self.InvFrame.Position = UDim2.new(0, sidebarArea + padding, 0, 50)
+        self.InvFrame.Size = UDim2.new(0, halfWidth, 1, -80) 
+        
+        -- ตารางฝั่งขวา (Current Offer)
+        self.TradeFrame.Position = UDim2.new(0, sidebarArea + halfWidth + (padding * 2), 0, 50)
+        self.TradeFrame.Size = UDim2.new(0, halfWidth, 1, -80) 
+        
         self.InvHeader.Text = "Selection List (" .. StateManager.currentSubTab .. ")"
         
     elseif StateManager.currentMainTab == "Dupe" then
@@ -1637,7 +1653,7 @@ function GUI:RenderPetDupeGrid()
 end
 
 function GUI:RenderCrateGrid()
-    self.InvContainer.ScrollBarThickness = 2 -- เพิ่มความหนา Scrollbar นิดหน่อยให้เห็นชัด
+    self.InvContainer.ScrollBarThickness = 0 -- เพิ่มความหนา Scrollbar นิดหน่อยให้เห็นชัด
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
     
