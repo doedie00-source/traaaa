@@ -1328,16 +1328,27 @@ function GUI:RefreshInventory()
 end
 
 function GUI:RenderPetDupeGrid()
-    -- [[ INTEGRATED PET GALLERY V7 LOGIC ]] --
+    -- [[ INTEGRATED PET GALLERY V7 LOGIC (ADJUSTED) ]] --
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
     
+    -- 1. [FIX] เพิ่ม Padding เพื่อไม่ให้การ์ดชิดขอบบน/ล่าง/ซ้าย/ขวา เกินไป
+    if not self.InvContainer:FindFirstChild("UIPadding") then
+        local padding = Instance.new("UIPadding", self.InvContainer)
+        padding.PaddingTop = UDim.new(0, 10)    -- เว้นขอบบน
+        padding.PaddingBottom = UDim.new(0, 10) -- เว้นขอบล่าง
+        padding.PaddingLeft = UDim.new(0, 10)   -- เว้นซ้าย
+        padding.PaddingRight = UDim.new(0, 10)  -- เว้นขวา
+    end
+    
     if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
+    
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
     if not layout then
         layout = Instance.new("UIGridLayout", self.InvContainer)
-        layout.CellSize = UDim2.new(0, 100, 0, 135)
+        -- 2. [FIX] ลดความสูง (ค่าตัวหลัง) จาก 135 เหลือ 120
+        layout.CellSize = UDim2.new(0, 100, 0, 120) 
         layout.CellPadding = UDim2.new(0, 10, 0, 10)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -1373,7 +1384,7 @@ function GUI:RenderPetDupeGrid()
         local evolution = petData.Evolution or 0
         local isEquipped = EquippedUUIDs[uuid] == true
         local isHighEvo = evolution >= 2
-        local isLocked = isEquipped -- Only lock equipped pets for now
+        local isLocked = isEquipped 
         
         local imageId = "rbxassetid://0"
         if PetsInfo[petName] and PetsInfo[petName].Image then
@@ -1434,7 +1445,6 @@ function GUI:RenderPetDupeGrid()
             UpdateState()
         end)
         
-        -- UI Elements (Stars, Image, Name)
         if isEquipped then
             local EqTag = Instance.new("TextLabel")
             EqTag.Text = "EQUIP"
@@ -1476,8 +1486,9 @@ function GUI:RenderPetDupeGrid()
         end
 
         local Viewport = Instance.new("ImageLabel")
+        -- [FIX] ปรับตำแหน่งรูปขึ้นนิดหน่อย เพราะการ์ดเตี้ยลง (จากเดิม Y 20 -> 15)
         Viewport.Size = UDim2.new(0, 65, 0, 65)
-        Viewport.Position = UDim2.new(0.5, -32.5, 0, 20)
+        Viewport.Position = UDim2.new(0.5, -32.5, 0, 15) 
         Viewport.BackgroundTransparency = 1
         Viewport.Image = imageId
         Viewport.ScaleType = Enum.ScaleType.Fit
@@ -1487,16 +1498,16 @@ function GUI:RenderPetDupeGrid()
         local NameLbl = Instance.new("TextLabel")
         NameLbl.Text = petName
         NameLbl.Size = UDim2.new(1, -4, 0, 30)
-        NameLbl.Position = UDim2.new(0, 2, 0, 85)
+        -- [FIX] ปรับตำแหน่งชื่อขึ้นตามรูป (จากเดิม Y 85 -> 78)
+        NameLbl.Position = UDim2.new(0, 2, 0, 78)
         NameLbl.BackgroundTransparency = 1
         NameLbl.TextColor3 = Color3.new(1,1,1)
         NameLbl.Font = Enum.Font.GothamBold
-        NameLbl.TextSize = 11
+        NameLbl.TextSize = 10 -- ลดขนาดฟอนต์นิดนึงให้สมดุล
         NameLbl.TextWrapped = true
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
         NameLbl.Parent = Card
         
-        -- UUID Display (Short)
         local shortID = uuid:sub(1, 5) .. ".." .. uuid:sub(#uuid - 4, #uuid)
         local UUIDDisplay = Instance.new("TextLabel")
         UUIDDisplay.Text = shortID
