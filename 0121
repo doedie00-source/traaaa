@@ -1650,8 +1650,9 @@ function GUI:RenderCrateGrid()
     local layout = self.InvContainer:FindFirstChild("UIGridLayout")
     if not layout then
         layout = Instance.new("UIGridLayout", self.InvContainer)
-        layout.CellPadding = UDim2.new(0, 10, 0, 10)
-        layout.CellSize = UDim2.new(0, 80, 0, 100) 
+        -- [ปรับจุดที่ 1] เปลี่ยนขนาดการ์ดให้สมดุลขึ้น (กว้าง 95 สูง 105)
+        layout.CellPadding = UDim2.new(0, 8, 0, 8)
+        layout.CellSize = UDim2.new(0, 95, 0, 105) 
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     end
@@ -1679,57 +1680,63 @@ function GUI:RenderCrateGrid()
         local Card = Instance.new("Frame")
         Card.Name = crate.DisplayName
         Card.Parent = self.InvContainer
-        Card.BackgroundColor3 = isOwnedInSystem and Color3.fromRGB(25, 25, 30) or Color3.fromRGB(35, 35, 40)
-        Card.BackgroundTransparency = isOwnedInSystem and 0.4 or 0
-        UIFactory.AddCorner(Card, 6)
+        Card.BackgroundColor3 = isOwnedInSystem and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(35, 35, 40)
+        Card.BackgroundTransparency = 0.1
+        UIFactory.AddCorner(Card, 8)
 
-        local strokeColor = Color3.fromRGB(55, 55, 60)
+        local strokeColor = Color3.fromRGB(60, 60, 65)
         if isOwnedInSystem then
             strokeColor = Color3.fromRGB(180, 40, 40) 
         elseif isSelected then
             strokeColor = THEME.CrateSelected
         end
 
-        local stroke = UIFactory.AddStroke(Card, strokeColor, 1.5, isOwnedInSystem and 0.4 or 0.2)
+        UIFactory.AddStroke(Card, strokeColor, 1.5, isOwnedInSystem and 0.3 or 0.2)
         
+        -- [ปรับจุดที่ 2] จัดตำแหน่งรูปภาพให้มี Space (ไม่ชิดขอบบนเกินไป)
         local Image = Instance.new("ImageLabel")
         Image.Parent = Card
         Image.BackgroundTransparency = 1
-        Image.Position = UDim2.new(0, 5, 0, 12) 
-        Image.Size = UDim2.new(1, -10, 0, 50)  
-        Image.ImageTransparency = isOwnedInSystem and 0.5 or 0
+        Image.Position = UDim2.new(0.5, -30, 0, 10) -- กึ่งกลาง และลงมาจากขอบบน 10px
+        Image.Size = UDim2.new(0, 60, 0, 60)  
+        Image.ImageTransparency = isOwnedInSystem and 0.6 or 0
         local imgId = tostring(crate.Image)
         if not imgId:find("rbxassetid://") then imgId = "rbxassetid://" .. imgId end
         Image.Image = imgId
         Image.ScaleType = Enum.ScaleType.Fit
+        Image.ZIndex = 2
         
+        -- [ปรับจุดที่ 3] จัดตำแหน่ง Text ให้ดูสะอาดตาขึ้น
         local NameLbl = Instance.new("TextLabel")
         NameLbl.Parent = Card
         NameLbl.BackgroundTransparency = 1
-        NameLbl.Position = UDim2.new(0, 2, 0, 65) 
-        NameLbl.Size = UDim2.new(1, -4, 0, 30)
-        NameLbl.Font = Enum.Font.Gotham
+        NameLbl.Position = UDim2.new(0, 5, 0, 72) -- เริ่มแสดงใต้รูปภาพ
+        NameLbl.Size = UDim2.new(1, -10, 0, 28)
+        NameLbl.Font = Enum.Font.GothamMedium
         
         if isSelected then
-            NameLbl.Text = crate.DisplayName .. "\n[x" .. StateManager.selectedCrates[crate.DisplayName] .. "]"
+            NameLbl.Text = crate.DisplayName .. "\n<font color='#00FF64'>[x" .. StateManager.selectedCrates[crate.DisplayName] .. "]</font>"
             NameLbl.TextColor3 = THEME.CrateSelected
         elseif isOwnedInSystem then
-            NameLbl.Text = crate.DisplayName .. "\n(OWNED)"
-            NameLbl.TextColor3 = Color3.fromRGB(130, 130, 130)
+            NameLbl.Text = crate.DisplayName .. "\n<font color='#AAAAAA'>(OWNED)</font>"
+            NameLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
         else
             NameLbl.Text = crate.DisplayName
-            NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+            NameLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
         end
         
-        NameLbl.TextSize = 8 
+        NameLbl.RichText = true -- เปิดใช้ RichText เพื่อให้ใส่สีเฉพาะจุดได้
+        NameLbl.TextSize = 9 
         NameLbl.TextWrapped = true
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
+        NameLbl.ZIndex = 2
 
         local ClickBtn = Instance.new("TextButton")
         ClickBtn.Parent = Card
         ClickBtn.BackgroundTransparency = 1
         ClickBtn.Size = UDim2.new(1, 0, 1, 0)
         ClickBtn.Text = ""
+        ClickBtn.ZIndex = 10 -- ให้ปุ่มอยู่บนสุดเพื่อให้กดง่าย
 
         ClickBtn.MouseButton1Click:Connect(function()
             if not Utils.IsTradeActive() then
