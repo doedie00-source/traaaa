@@ -647,21 +647,38 @@ function TradeManager.ExecuteMagicDupe(recipe, statusLabel, amount)
 end
 
 function TradeManager.ExecutePetDupe(statusLabel)
-    -- [[ 1. ตรวจสอบสถานะเทรดและ Debounce กัน Spam ]] --
     if TradeManager.IsProcessing then return end
     if not Utils.IsTradeActive() then
         StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, statusLabel)
         return
     end
 
-    -- ตรวจสอบรายการที่เลือก
+    local replica = ReplicaListener:GetReplica()
+    local myPets = replica.Data.PetsService.Pets
+    
     local selectedUUIDs = {}
+    local hasEvo2 = false -- ตัวแปรเช็คว่ามี Evo 2 ไหม
+
     for uuid, selected in pairs(StateManager.selectedPets) do
-        if selected then table.insert(selectedUUIDs, uuid) end
+        if selected then
+            -- [[ ตรวจสอบ Evolution ก่อนเริ่ม Dupe ]]
+            local petData = myPets[uuid]
+            if petData and (petData.Evolution or 0) >= 2 then
+                hasEvo2 = true
+                break -- เจอตัวเดียวก็พอ สั่งหยุดเช็คทันที
+            end
+            table.insert(selectedUUIDs, uuid)
+        end
+    end
+
+    -- [[ ถ้ามี Evo 2 อยู่ในรายการที่เลือก ห้าม Dupe! ]]
+    if hasEvo2 then
+        StateManager:SetStatus("❌ Cannot Dupe Evo 2 pets! (Unselect them)", THEME.Fail, statusLabel)
+        return
     end
 
     if #selectedUUIDs == 0 then
-        StateManager:SetStatus("⚠️ Select pets to dupe first!", THEME.Fail, statusLabel)
+        StateManager:SetStatus("⚠️ Select pets (Evo 0-1) to dupe!", THEME.Fail, statusLabel)
         return
     end
 
@@ -772,6 +789,12 @@ function TradeManager.ExecutePetDupe(statusLabel)
 end
 
 function TradeManager.DeleteSelectedPets(statusLabel, callback)
+    -- [[ เพิ่มการเช็ค: ถ้าเทรดเปิดอยู่ ห้ามลบเด็ดขาด ]]
+    if Utils.IsTradeActive() then
+        StateManager:SetStatus("⚠️ Close trade menu before deleting!", THEME.Fail, statusLabel)
+        return
+    end
+
     local selectedUUIDs = {}
     for uuid, selected in pairs(StateManager.selectedPets) do
         if selected then table.insert(selectedUUIDs, uuid) end
@@ -1132,12 +1155,20 @@ function GUI:CreateCenterPanel()
         BgColor = THEME.Fail,
         Parent = self.PetActionBar,
         OnClick = function()
-            local count = 0
-            for _, _ in pairs(StateManager.selectedPets) do count = count + 1 end
-            if count == 0 then return end
-            self:ShowConfirm("Delete " .. count .. " Pets?", function()
+            -- [[ ตรวจสอบก่อนเปิดหน้าต่าง Confirm ]]
+            if Utils.IsTradeActive() then
+                StateManager:SetStatus("🔒 Safety Lock: Close Trade to Delete", THEME.Fail, self.StatusLabel)
+                return
+            end
+
+            local selectedCount = 0
+            for _ in pairs(StateManager.selectedPets) do selectedCount = selectedCount + 1 end
+            if selectedCount == 0 then return end
+
+            self:ShowConfirm("Delete " .. selectedCount .. " Pets?", function()
                 TradeManager.DeleteSelectedPets(self.StatusLabel, function()
                     task.wait(0.5)
+                    StateManager.selectedPets = {} 
                     self:RefreshInventory()
                 end)
             end)
