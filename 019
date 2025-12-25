@@ -1637,9 +1637,20 @@ function GUI:RenderPetDupeGrid()
 end
 
 function GUI:RenderCrateGrid()
-    self.InvContainer.ScrollBarThickness = 0
+    self.InvContainer.ScrollBarThickness = 2 -- เพิ่มความหนา Scrollbar นิดหน่อยให้เห็นชัด
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     self.InvContainer.CanvasSize = UDim2.new(0, 0, 0, 0)     
+    
+    -- [[ เพิ่มส่วนนี้: จัดการระยะห่างขอบกรง (Container Padding) ]] --
+    local containerPadding = self.InvContainer:FindFirstChild("UIPadding")
+    if not containerPadding then
+        containerPadding = Instance.new("UIPadding", self.InvContainer)
+    end
+    -- ดันจากขอบ บน-ล่าง 15px และ ซ้าย-ขวา 10px
+    containerPadding.PaddingTop = UDim.new(0, 15)
+    containerPadding.PaddingBottom = UDim.new(0, 15)
+    containerPadding.PaddingLeft = UDim.new(0, 10)
+    containerPadding.PaddingRight = UDim.new(0, 10)
     
     local replica = ReplicaListener:GetReplica()
     local playerData = replica and replica.Data
