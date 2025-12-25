@@ -1210,163 +1210,130 @@ function GUI:RefreshInventory()
     end
 end
 
-ร้าง Header แยกออกมาอยู่เหนือ InvContainer ในฟังก์ชันหลัก แต่เพื่อความง่ายในการ Paste
-    -- เราจะใส่ ActionHeader เป็นลูกของ InvContainer แต่ต้องระวังเรื่อง Grid บีบอัด
-    -- *ทางเลือกที่ดีที่สุดในเคสนี้:* เปลี่ยน Grid CellSize เป็นแบบ Scale หรือใช้ Scroll แยก
-    -- แต่เพื่อให้ง่าย ผมจะขออนุญาต **สร้าง Header ลอยเหนือ Grid** โดยใช้ Parent เป็น self.InvFrame แทน
+function GUI:RenderPetGalleryV7()
+    -- 1. ล้างหน้าจอและเตรียม Grid แบบ V7
+    for _, child in pairs(self.InvContainer:GetChildren()) do
+        if not child:IsA("UIListLayout") and not child:IsA("UIGridLayout") then child:Destroy() end
+    end
     
-    -- ลบ Header เก่าถ้ามี (ป้องกันการซ้อนทับเวลา Refresh)
-    if self.InvFrame:FindFirstChild("V7_ActionHeader") then
-        self.InvFrame.V7_ActionHeader:Destroy()
+    if self.InvContainer:FindFirstChild("UIListLayout") then self.InvContainer.UIListLayout:Destroy() end
+    local layout = self.InvContainer:FindFirstChild("UIGridLayout")
+    if not layout then
+        layout = Instance.new("UIGridLayout", self.InvContainer)
+        layout.CellPadding = UDim2.new(0, 10, 0, 10)
+        layout.CellSize = UDim2.new(0, 100, 0, 135)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+    end
+    self.InvContainer.ScrollBarThickness = 2
+    self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+    -- 2. สร้าง Header สำหรับปุ่ม Dupe และ Delete (สไตล์ V7)
+    local ActionHeader = Instance.new("Frame")
+    ActionHeader.Name = "00_ActionHeader"
+    ActionHeader.Size = UDim2.new(1, 0, 0, 40)
+    ActionHeader.BackgroundTransparency = 1
+    ActionHeader.Parent = self.InvContainer
+    layout.SortOrder = Enum.SortOrder.Name -- ให้ Header อยู่บนสุด
+
+    local function getSelectedCount()
+        local c = 0 for _ in pairs(StateManager.selectedPetsForDupe) do c = c + 1 end return c
     end
 
-    local FixedHeader = Instance.new("Frame")
-    FixedHeader.Name = "V7_ActionHeader"
-    FixedHeader.Size = UDim2.new(1, -20, 0, 40)
-    FixedHeader.Position = UDim2.new(0, 10, 0, 35) -- อยู่ใต้คำว่า "List"
-    FixedHeader.BackgroundTransparency = 1
-    FixedHeader.Parent = self.InvFrame
-    
-    -- ขยับ Container ลงมาหน่อยเพื่อหลบ Header
-    self.InvContainer.Position = UDim2.new(0, 5, 0, 80)
-    self.InvContainer.Size = UDim2.new(1, -10, 1, -85)
-
-    -- ปุ่ม DUPE (สีม่วงตามรูป)
+    -- ปุ่ม DUPE
     local DupeBtn = UIFactory.CreateButton({
-        Size = UDim2.new(0, 110, 0, 32),
-        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(0, 100, 0, 30),
+        Position = UDim2.new(0, 10, 0, 0),
         Text = "DUPE",
-        BgColor = Color3.fromRGB(170, 0, 255), -- สีม่วงสด
-        Parent = FixedHeader,
-        Font = Enum.Font.GothamBold,
-        TextSize = 14,
+        BgColor = THEME.BtnDupe,
+        Parent = ActionHeader,
         OnClick = function()
-            -- [LOGIC การ DUPE]
-            if not Utils.IsTradeActive() then
-                StateManager:SetStatus("⚠️ Open Trade Menu first!", THEME.Fail, self.StatusLabel)
-                return
-            end
-            
-            local count = Utils.CountTable(StateManager.selectedPetsForDupe)
-            if count == 0 then
+            if getSelectedCount() == 0 then
                 StateManager:SetStatus("Select pets first!", THEME.Fail, self.StatusLabel)
                 return
             end
-
-            StateManager:SetStatus("🚀 Processing " .. count .. " pets...", Color3.fromRGB(170, 0, 255), self.StatusLabel)
-
-            local sentCount = 0
-            for uuid, _ in pairs(StateManager.selectedPetsForDupe) do
-                local petData = myPets[uuid]
-                if petData then
-                    -- ส่งสัญญาณ Add เข้าเทรด
-                    TradeManager.SendTradeSignal("Add", {
-                        Name = petData.Name,
-                        Guid = uuid,
-                        Service = "PetsService",
-                        Category = "Pets",
-                        RawInfo = petData
-                    }, 1, self.StatusLabel)
-                    sentCount = sentCount + 1
-                    task.wait(0.05)
-                end
-            end
-            
-            StateManager:SetStatus("✅ Sent " .. sentCount .. " pets to Trade!", THEME.Success, self.StatusLabel)
-            -- self:RefreshInventory() -- รีเฟรชถ้าต้องการ (อาจจะทำให้หน้าจอกระตุก)
+            -- [ใส่ฟังก์ชัน Dupe ของคุณที่นี่]
+            StateManager:SetStatus("Dupe function logic goes here!", THEME.BtnDupe, self.StatusLabel)
         end
     })
-    -- เพิ่ม Stroke ให้ปุ่ม Dupe ดูเด่น
-    UIFactory.AddStroke(DupeBtn, Color3.fromRGB(255, 255, 255), 2, 0.2)
 
-    -- ปุ่ม DELETE (สีแดง)
-    local currentSelectCount = Utils.CountTable(StateManager.selectedPetsForDupe)
+    -- ปุ่ม DELETE
     local DeleteBtn = UIFactory.CreateButton({
-        Size = UDim2.new(0, 110, 0, 32),
+        Size = UDim2.new(0, 100, 0, 30),
         Position = UDim2.new(0, 120, 0, 0),
-        Text = "DELETE (" .. currentSelectCount .. ")",
-        BgColor = Color3.fromRGB(255, 60, 60),
-        Parent = FixedHeader,
-        Font = Enum.Font.GothamBold,
-        TextSize = 12,
+        Text = "DELETE ("..getSelectedCount()..")",
+        BgColor = THEME.ItemEquip,
+        Parent = ActionHeader,
         OnClick = function()
-            -- [LOGIC การ DELETE]
-            local count = Utils.CountTable(StateManager.selectedPetsForDupe)
+            local count = getSelectedCount()
             if count == 0 then return end
-            
+            -- เรียกใช้ Popup ยืนยัน (ถ้ามี) หรือลบเลย
             local uuids = {}
             for id, _ in pairs(StateManager.selectedPetsForDupe) do table.insert(uuids, id) end
             
-            local success, DeleteRemote = pcall(function()
-                return ReplicatedStorage.Packages.Knit.Services.PetsService.RF.Delete
-            end)
-            
+            local success, DeleteRemote = pcall(function() return ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("PetsService"):WaitForChild("RF"):WaitForChild("Delete") end)
             if success and DeleteRemote then
                 DeleteRemote:InvokeServer(uuids)
                 StateManager.selectedPetsForDupe = {}
                 self:RefreshInventory()
-                StateManager:SetStatus("🗑️ Deleted " .. count .. " pets.", THEME.Success, self.StatusLabel)
+                StateManager:SetStatus("Successfully deleted "..count.." pets", THEME.Success, self.StatusLabel)
             end
         end
     })
 
-    -- =================================================================
-    -- 3. เตรียมข้อมูลและเรียงลำดับ (Sort)
-    -- =================================================================
+    -- 3. ดึงข้อมูลสัตว์เลี้ยง (Replica Data)
+    local replica = ReplicaListener:GetReplica()
+    if not (replica and replica.Data.PetsService) then return end
+    
+    local myPets = replica.Data.PetsService.Pets
+    local equipped = replica.Data.PetsService.EquippedPets or {}
+    local eqMap = {} for _, v in pairs(equipped) do eqMap[v] = true end
+
+    -- เรียงลำดับ (Equipped ขึ้นก่อน > จำนวนดาว > ชื่อ)
     local sorted = {}
     for uuid, data in pairs(myPets) do data.UUID = uuid table.insert(sorted, data) end
     table.sort(sorted, function(a, b)
-        if eqMap[a.UUID] ~= eqMap[b.UUID] then return eqMap[a.UUID] end -- ใส่แล้วอยู่บน
-        if (a.Evolution or 0) ~= (b.Evolution or 0) then return (a.Evolution or 0) > (b.Evolution or 0) end -- ดาวเยอะอยู่บน
-        return (a.Name or "") < (b.Name or "") -- เรียงตามชื่อ
+        if eqMap[a.UUID] ~= eqMap[b.UUID] then return eqMap[a.UUID] end
+        if (a.Evolution or 0) ~= (b.Evolution or 0) then return (a.Evolution or 0) > (b.Evolution or 0) end
+        return (a.Name or "") < (b.Name or "")
     end)
 
-    -- =================================================================
-    -- 4. วนลูปสร้างการ์ด (Style V7)
-    -- =================================================================
+    -- 4. สร้างการ์ดสัตว์เลี้ยง (V7 Card Logic)
     for _, petData in ipairs(sorted) do
         local uuid = petData.UUID
         local petName = petData.Name or "Unknown"
         local evo = petData.Evolution or 0
         local isEquipped = eqMap[uuid]
         local isSelected = StateManager.selectedPetsForDupe[uuid] ~= nil
-        local isLocked = isEquipped or evo >= 2 -- ล็อกถ้าใส่ หรือ Evo สูง (ตาม logic V7)
+        local isLocked = isEquipped or evo >= 2
 
-        -- :::: CARD FRAME ::::
         local Card = Instance.new("Frame")
-        Card.Name = uuid
-        Card.BackgroundColor3 = Color3.fromRGB(35, 35, 35) -- CardColor
+        Card.Name = "PetCard_" .. uuid
+        Card.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
         Card.Parent = self.InvContainer
-        UIFactory.AddCorner(Card, 6)
+        Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 6)
         
-        -- :::: STROKE (ขอบสี) ::::
+        -- เส้นขอบตามสถานะ
         local stroke = Instance.new("UIStroke", Card)
         stroke.Thickness = 2
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        if isLocked then 
-            stroke.Color = Color3.fromRGB(255, 60, 60) -- LockedColor (Red)
-            stroke.Enabled = true
-        elseif isSelected then 
-            stroke.Color = Color3.fromRGB(0, 255, 127) -- SelectionColor (Green)
-            stroke.Enabled = true
-        else 
-            stroke.Enabled = false 
-        end
+        if isLocked then stroke.Color = Color3.fromRGB(255, 60, 60) stroke.Enabled = true
+        elseif isSelected then stroke.Color = Color3.fromRGB(0, 255, 127) stroke.Enabled = true
+        else stroke.Enabled = false end
 
-        -- :::: CHECKMARK (เครื่องหมายถูก) ::::
-        if isSelected then
-            local check = Instance.new("TextLabel", Card)
-            check.Text = "✓"
-            check.Size = UDim2.new(0, 20, 0, 20)
-            check.Position = UDim2.new(1, -22, 1, -22)
-            check.BackgroundTransparency = 1
-            check.TextColor3 = Color3.fromRGB(0, 255, 127)
-            check.Font = Enum.Font.GothamBlack
-            check.TextSize = 18
-            check.ZIndex = 10
-        end
+        -- เครื่องหมายถูก (Checkmark)
+        local check = Instance.new("TextLabel", Card)
+        check.Text = "✓"
+        check.Size = UDim2.new(0, 20, 0, 20)
+        check.Position = UDim2.new(1, -22, 1, -22)
+        check.BackgroundTransparency = 1
+        check.TextColor3 = Color3.fromRGB(0, 255, 127)
+        check.Font = Enum.Font.GothamBlack
+        check.TextSize = 18
+        check.Visible = isSelected
+        check.ZIndex = 10
 
-        -- :::: STARS (ดาว Evolution) ::::
+        -- ดาว (Stars Evolution)
         if evo > 0 then
             local starFrame = Instance.new("Frame", Card)
             starFrame.Size = UDim2.new(0, 40, 0, 20)
@@ -1382,11 +1349,11 @@ end
                 s.Image = "rbxassetid://3926305904"
                 s.ImageRectOffset = Vector2.new(116, 4)
                 s.ImageRectSize = Vector2.new(24, 24)
-                s.ImageColor3 = Color3.fromRGB(255, 215, 0) -- StarColor (Gold)
+                s.ImageColor3 = Color3.fromRGB(255, 215, 0)
             end
         end
 
-        -- :::: IMAGE (รูปสัตว์) ::::
+        -- รูปสัตว์เลี้ยง
         local img = Instance.new("ImageLabel", Card)
         img.Size = UDim2.new(0, 65, 0, 65)
         img.Position = UDim2.new(0.5, -32.5, 0, 20)
@@ -1394,7 +1361,7 @@ end
         if PetsInfo[petName] then img.Image = "rbxassetid://" .. tostring(PetsInfo[petName].Image) end
         img.ScaleType = Enum.ScaleType.Fit
 
-        -- :::: NAME (ชื่อสัตว์) ::::
+        -- ชื่อสัตว์เลี้ยง
         local nameLbl = Instance.new("TextLabel", Card)
         nameLbl.Text = petName
         nameLbl.Size = UDim2.new(1, -4, 0, 20)
@@ -1403,9 +1370,8 @@ end
         nameLbl.TextColor3 = Color3.new(1,1,1)
         nameLbl.Font = Enum.Font.GothamBold
         nameLbl.TextSize = 10
-        nameLbl.TextWrapped = true
 
-        -- :::: EQUIP TAG ::::
+        -- ป้าย EQ (Equipped)
         if isEquipped then
             local eq = Instance.new("TextLabel", Card)
             eq.Text = "EQUIP"
@@ -1417,41 +1383,34 @@ end
             eq.BackgroundTransparency = 1
         end
 
-        -- :::: UUID DISPLAY (ข้างล่าง) ::::
+        -- UUID Display (ไม่มีระบบ Copy ตามสั่ง)
         local idLbl = Instance.new("TextLabel", Card)
-        -- ตัดเลขให้สั้นลงแบบ V7 (e.g., 69224..2e06)
-        local shortID = uuid:sub(1, 5) .. ".." .. uuid:sub(-4)
-        idLbl.Text = shortID
+        idLbl.Text = uuid:sub(1, 5) .. ".." .. uuid:sub(-4)
         idLbl.Size = UDim2.new(1, -8, 0, 16)
         idLbl.Position = UDim2.new(0, 4, 1, -20)
         idLbl.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
         idLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
         idLbl.Font = Enum.Font.Code
-        idLbl.TextSize = 9
-        UIFactory.AddCorner(idLbl, 4)
+        idLbl.TextSize = 8
+        Instance.new("UICorner", idLbl).CornerRadius = UDim.new(0, 4)
 
-        -- :::: CLICK EVENT (การเลือก) ::::
+        -- ปุ่มคลิกเลือก
         local click = Instance.new("TextButton", Card)
         click.Size = UDim2.new(1, 0, 1, 0)
         click.BackgroundTransparency = 1
         click.Text = ""
         click.ZIndex = 20
-        
         click.MouseButton1Click:Connect(function()
             if isLocked then 
-                StateManager:SetStatus("🔒 Pet is Equipped or High Tier!", Color3.fromRGB(255, 60, 60), self.StatusLabel)
+                StateManager:SetStatus("Cannot select Equipped or High Evolution pets!", THEME.Fail, self.StatusLabel)
                 return 
             end
-            
-            -- Toggle Selection
             if StateManager.selectedPetsForDupe[uuid] then
                 StateManager.selectedPetsForDupe[uuid] = nil
             else
                 StateManager.selectedPetsForDupe[uuid] = true
             end
-            
-            -- Refresh แค่ UI ไม่โหลดใหม่ทั้งหมด (เพื่อประสิทธิภาพ)
-            self:RefreshInventory() 
+            self:RefreshInventory()
         end)
     end
 end
