@@ -1134,6 +1134,7 @@ function GUI:SetupKeybind()
     end)
 end
 
+-- แทนที่ในส่วน UpdateUIState
 function GUI:UpdateUIState()
     self:UpdateSubTabs()
     self.DupeWarning.Visible = false
@@ -1146,16 +1147,15 @@ function GUI:UpdateUIState()
     end
 
     -- 2. ตั้งค่าขนาด ScrollingFrame มาตรฐาน
-    -- ปรับ Position ให้เริ่มที่เดิม (35) แต่ลดความสูง (Size) ลงเหลือ -90 เพื่อเว้นที่ว่างด้านล่าง 50px
     self.InvContainer.Position = UDim2.new(0, 5, 0, 35)
-    self.InvContainer.Size = UDim2.new(1, -10, 1, -90) 
+    self.InvContainer.Size = UDim2.new(1, -10, 1, -90)
 
     if StateManager.currentMainTab == "Players" then
         self.SubMenuFrame.Visible = false
         self.TradeFrame.Visible = false
         self.InvFrame.Size = UDim2.new(1, -150, 1, -80) 
         self.InvHeader.Text = "  Server Players (Force Trade)"
-        self.InvContainer.Size = UDim2.new(1, -10, 1, -40) -- หน้าอื่นใช้ขนาดเต็มปกติ
+        self.InvContainer.Size = UDim2.new(1, -10, 1, -40)
         
     elseif StateManager.currentMainTab == "Trade" then
         self.SubMenuFrame.Visible = true
@@ -1172,8 +1172,10 @@ function GUI:UpdateUIState()
         self.InvFrame.Size = UDim2.new(1, -150, 1, -80)
         self.InvHeader.Text = "  ✨ Magic Dupe (" .. StateManager.currentDupeTab .. ")"
         
-        -- ถ้าไม่ใช่หน้า Pets ให้กลับไปใช้ขนาดเต็ม
-        if StateManager.currentDupeTab ~= "Pets" then
+        -- 🎯 สำคัญ: ถ้าเป็นหน้า Pets ให้ลดขนาด InvContainer เพื่อเว้นที่ปุ่มด้านล่าง
+        if StateManager.currentDupeTab == "Pets" then
+            self.InvContainer.Size = UDim2.new(1, -10, 1, -100) -- เพิ่มพื้นที่ 10px สำหรับปุ่ม
+        else
             self.InvContainer.Size = UDim2.new(1, -10, 1, -40)
         end
 
@@ -1222,7 +1224,7 @@ function GUI:RefreshInventory()
     end
 end
 
-function GUI:RenderPetGalleryV7()function GUI:RenderPetGalleryV7()
+function GUI:RenderPetGalleryV7()
     -- 1. ล้างข้อมูลเก่าและตั้งค่า Grid
     for _, child in pairs(self.InvContainer:GetChildren()) do
         if not child:IsA("UIListLayout") and not child:IsA("UIGridLayout") then child:Destroy() end
@@ -1240,21 +1242,24 @@ function GUI:RenderPetGalleryV7()function GUI:RenderPetGalleryV7()
     self.InvContainer.ScrollBarThickness = 2
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
-    -- 2. สร้างแถบควบคุมด้านล่าง (Bottom Controls)
+    -- 2. ปรับขนาด InvContainer ให้เหลือพื้นที่สำหรับปุ่มด้านล่าง
+    self.InvContainer.Size = UDim2.new(1, -10, 1, -100) -- เพิ่มพื้นที่ด้านล่าง
+
+    -- 3. สร้างแถบควบคุมด้านล่าง (Bottom Controls)
     local BottomControls = Instance.new("Frame")
     BottomControls.Name = "PetBottomControls"
-    BottomControls.Size = UDim2.new(1, -20, 0, 45) -- เพิ่มความสูงเล็กน้อย
-    BottomControls.Position = UDim2.new(0, 10, 1, -55) -- วางใกล้ขอบล่าง
+    BottomControls.Size = UDim2.new(1, -20, 0, 45)
+    BottomControls.Position = UDim2.new(0, 10, 1, -55) -- ห่างจากขอบล่าง 10px
     BottomControls.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     BottomControls.BackgroundTransparency = 0.3
     BottomControls.Parent = self.InvFrame
     UIFactory.AddCorner(BottomControls, 8)
     UIFactory.AddStroke(BottomControls, Color3.fromRGB(60, 60, 70), 1.5, 0.4)
 
-    -- 3. สร้าง Layout สำหรับจัดปุ่มในแนวนอน
+    -- 4. สร้าง Layout สำหรับจัดปุ่มในแนวนอน
     local ButtonContainer = Instance.new("Frame")
-    ButtonContainer.Size = UDim2.new(1, -10, 1, -10)
-    ButtonContainer.Position = UDim2.new(0, 5, 0, 5)
+    ButtonContainer.Size = UDim2.new(1, -20, 1, -10) -- ลด padding
+    ButtonContainer.Position = UDim2.new(0, 10, 0, 5)
     ButtonContainer.BackgroundTransparency = 1
     ButtonContainer.Parent = BottomControls
 
@@ -1262,7 +1267,7 @@ function GUI:RenderPetGalleryV7()function GUI:RenderPetGalleryV7()
     buttonLayout.FillDirection = Enum.FillDirection.Horizontal
     buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    buttonLayout.Padding = UDim.new(0, 10)
+    buttonLayout.Padding = UDim.new(0, 8) -- ลดระยะห่าง
 
     local function getSelectedCount()
         local c = 0 
@@ -1270,24 +1275,24 @@ function GUI:RenderPetGalleryV7()function GUI:RenderPetGalleryV7()
         return c
     end
 
-    -- 4. ข้อความแสดงจำนวนที่เลือก
+    -- 5. ข้อความแสดงจำนวนที่เลือก
     local CountLabel = UIFactory.CreateLabel({
-        Size = UDim2.new(0, 120, 1, 0),
+        Size = UDim2.new(0, 90, 1, 0), -- ลดขนาดลง
         Text = "Selected: 0",
         TextColor = THEME.TextWhite,
         Font = Enum.Font.GothamBold,
-        TextSize = 13,
+        TextSize = 12, -- ลดขนาดตัวอักษร
         Parent = ButtonContainer
     })
 
-    -- 5. ปุ่ม DELETE (ย้ายมาอยู่ด้านล่าง)
+    -- 6. ปุ่ม DELETE (ขนาดที่พอดี)
     local currentCount = getSelectedCount()
     local DeleteBtn = UIFactory.CreateButton({
-        Size = UDim2.new(0, 110, 1, -5),
+        Size = UDim2.new(0, 95, 1, -5), -- ลดขนาดลง
         Text = "🗑️ DELETE",
         BgColor = THEME.ItemEquip,
         Font = Enum.Font.GothamBold,
-        TextSize = 13,
+        TextSize = 12, -- ลดขนาดตัวอักษร
         CornerRadius = 6,
         Parent = ButtonContainer,
         OnClick = function()
@@ -1317,13 +1322,13 @@ function GUI:RenderPetGalleryV7()function GUI:RenderPetGalleryV7()
         end
     })
 
-    -- 6. ปุ่ม DUPE (ย้ายมาอยู่ด้านล่าง)
+    -- 7. ปุ่ม DUPE (ขนาดที่พอดี)
     local DupeBtn = UIFactory.CreateButton({
-        Size = UDim2.new(0, 110, 1, -5),
+        Size = UDim2.new(0, 95, 1, -5), -- ลดขนาดลงเท่ากับ DELETE
         Text = "✨ DUPE",
         BgColor = THEME.BtnDupe,
         Font = Enum.Font.GothamBold,
-        TextSize = 13,
+        TextSize = 12, -- ลดขนาดตัวอักษร
         CornerRadius = 6,
         Parent = ButtonContainer,
         OnClick = function()
