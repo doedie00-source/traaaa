@@ -1257,25 +1257,50 @@ function GUI:RenderPetGalleryV7()
         end
     })
 
-    -- ปุ่ม DELETE
+    -- 1. คำนวณจำนวนที่เลือกไว้ก่อนเพื่อแสดงบนปุ่ม
+    local currentCount = Utils.CountTable(StateManager.selectedPetsForDupe)
+
+    -- 2. สร้างปุ่ม DELETE
     local DeleteBtn = UIFactory.CreateButton({
         Size = UDim2.new(0, 100, 0, 30),
         Position = UDim2.new(0, 120, 0, 0),
-        Text = "DELETE ("..getSelectedCount()..")",
+        Text = "DELETE (" .. currentCount .. ")", -- ใช้ Utils.CountTable แทนชื่อเดิม
         BgColor = THEME.ItemEquip,
         Parent = ActionHeader,
         OnClick = function()
-            local count = getSelectedCount()
-            if count == 0 then return end
-            -- เรียกใช้ Popup ยืนยัน (ถ้ามี) หรือลบเลย
-            local uuids = {}
-            for id, _ in pairs(StateManager.selectedPetsForDupe) do table.insert(uuids, id) end
+            -- เช็คจำนวนอีกครั้งตอนกดปุ่ม
+            local count = Utils.CountTable(StateManager.selectedPetsForDupe)
             
-            local DeleteRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("PetsService"):WaitForChild("RF"):WaitForChild("Delete")
-            DeleteRemote:InvokeServer(uuids)
-            StateManager.selectedPetsForDupe = {}
-            self:RefreshInventory()
-            StateManager:SetStatus("Successfully deleted "..count.." pets", THEME.Success, self.StatusLabel)
+            if count == 0 then 
+                StateManager:SetStatus("⚠️ Select pets first!", THEME.Fail, self.StatusLabel)
+                return 
+            end
+            
+            -- เตรียม UUID สำหรับส่งไปลบ
+            local uuids = {}
+            for id, _ in pairs(StateManager.selectedPetsForDupe) do 
+                table.insert(uuids, id) 
+            end
+            
+            -- เรียกใช้ Remote ลบของตัวเกม
+            local success, DeleteRemote = pcall(function()
+                return ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("PetsService"):WaitForChild("RF"):WaitForChild("Delete")
+            end)
+            
+            if success and DeleteRemote then
+                DeleteRemote:InvokeServer(uuids)
+                
+                -- ล้างค่ารายการที่เลือกทิ้ง
+                StateManager.selectedPetsForDupe = {}
+                
+                -- สั่งวาดหน้าจอใหม่ทันที
+                self:RefreshInventory()
+                
+                -- แสดงสถานะความสำเร็จ
+                StateManager:SetStatus("✅ Successfully deleted " .. count .. " pets", THEME.Success, self.StatusLabel)
+            else
+                StateManager:SetStatus("❌ Error: Delete Remote not found!", THEME.Fail, self.StatusLabel)
+            end
         end
     })
 
