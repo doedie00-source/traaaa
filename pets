@@ -11,6 +11,7 @@
 -- ========================================== --
 -- 📦 Services & Dependencies
 -- ========================================== --
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
@@ -1220,7 +1221,7 @@ function GUI:RefreshInventory()
             self:RenderDupeMenu()
         end
     end
-
+end 
 function GUI:RenderCrateGrid()
     self.InvContainer.ScrollBarThickness = 0
     self.InvContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y 
@@ -1831,5 +1832,9 @@ function GUI:StartMonitoring()
 end
 local app = GUI
 app:Initialize()
+
+-- ========================================== --
+-- 🚀 Initialize
+-- ========================================== --
 
 print("✅ Universal Trade System V" .. CONFIG.VERSION .. " loaded successfully!")
