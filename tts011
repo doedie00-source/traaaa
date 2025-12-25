@@ -1074,6 +1074,7 @@ function GUI:CreateMainTabs(parent)
             CornerRadius = 6,
             Parent = parent,
             OnClick = function()
+                StateManager:ClearSelections() -- [[ เพิ่มตรงนี้: ล้างค่าเมื่อกดเปลี่ยนหน้าหลัก ]]
                 StateManager.currentMainTab = tab.name
                 self:UpdateUIState()
             end
@@ -1106,6 +1107,7 @@ function GUI:UpdateSubTabs()
             CornerRadius = 6,
             Parent = self.SubMenuFrame,
             OnClick = function()
+                StateManager:ClearSelections() -- [[ เพิ่มตรงนี้: ล้างค่าเมื่อกดสลับ Pets/Crates/Tickets ]]
                 if StateManager.currentMainTab == "Trade" then
                     StateManager.currentSubTab = tabName
                 else
@@ -1472,7 +1474,6 @@ function GUI:SetupKeybind()
 end
 
 function GUI:UpdateUIState()
-    StateManager:ClearSelections()
     self:UpdateSubTabs()
     self.DupeWarning.Visible = false
     
