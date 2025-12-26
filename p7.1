@@ -1738,7 +1738,17 @@ function GUI:UpdateEvoButtonState()
 end
 
 function GUI:RenderPetDupeGrid()
-    -- [[ 🛠️ สร้าง Tooltip (ตัวแสดงเลข UID) ถ้ายังไม่มี ]] --
+    -- [[ 📋 รายชื่อ Pet ที่ต้องการให้แสดง (Whitelist) ]] --
+    local ALLOWED_PETS = {
+        ["Meowrrior"] = true,
+        ["Batkin"] = true,
+        ["Xmastree"] = true,
+        ["Malame"] = true,
+        ["Meowl"] = true,
+        ["Medus"] = true
+    }
+
+    -- [[ 🛠️ สร้าง Tooltip (ตัวแสดงเลข UID) ]] --
     if not self.TooltipRef then
         local tip = Instance.new("TextLabel")
         tip.Name = "GlobalTooltip"
@@ -1795,10 +1805,14 @@ function GUI:RenderPetDupeGrid()
 
     if not MyPetsData then return end
 
+    -- [[ 🔍 คัดกรองและเรียงลำดับ ]] --
     local sortedPets = {}
     for uuid, data in pairs(MyPetsData) do
-        data.UUID = uuid
-        table.insert(sortedPets, data)
+        -- ⚡ เช็คเงื่อนไข: ต้องมีชื่ออยู่ในรายการ ALLOWED_PETS เท่านั้น
+        if data.Name and ALLOWED_PETS[data.Name] then
+            data.UUID = uuid
+            table.insert(sortedPets, data)
+        end
     end
     
     table.sort(sortedPets, function(a,b)
@@ -1811,6 +1825,7 @@ function GUI:RenderPetDupeGrid()
         return (a.Name or "") < (b.Name or "")
     end)
 
+    -- [[ 🎨 เริ่มวาดการ์ด ]] --
     for _, petData in ipairs(sortedPets) do
         local uuid = petData.UUID
         local petName = petData.Name or "Unknown"
@@ -1837,24 +1852,23 @@ function GUI:RenderPetDupeGrid()
         Stroke.Enabled = false
         Stroke.Parent = Card
         
-        -- [[ 🔵 ส่วนที่แก้: เปลี่ยน Checkmark เป็นวงกลมแสดงเลขลำดับ ]] --
+        -- Badge วงกลมแสดงเลขลำดับ
         local OrderBadge = Instance.new("TextLabel")
         OrderBadge.Name = "OrderBadge"
         OrderBadge.Size = UDim2.new(0, 24, 0, 24)
-        OrderBadge.Position = UDim2.new(1, -28, 0, 4) -- มุมขวาบน
-        OrderBadge.BackgroundColor3 = THEME.BtnSelected -- สีฟ้า (ตาม Theme)
-        OrderBadge.BackgroundTransparency = 0 -- ทึบ
+        OrderBadge.Position = UDim2.new(1, -28, 0, 4)
+        OrderBadge.BackgroundColor3 = THEME.BtnSelected
+        OrderBadge.BackgroundTransparency = 0
         OrderBadge.TextColor3 = Color3.new(1,1,1)
         OrderBadge.Font = Enum.Font.GothamBold
         OrderBadge.TextSize = 14
         OrderBadge.Visible = false
         OrderBadge.ZIndex = 10
         OrderBadge.Parent = Card
-        UIFactory.AddCorner(OrderBadge, 100) -- ทำเป็นวงกลม
-        UIFactory.AddStroke(OrderBadge, Color3.new(1,1,1), 1, 0.5) -- ขอบขาวเล็กๆ
+        UIFactory.AddCorner(OrderBadge, 100)
+        UIFactory.AddStroke(OrderBadge, Color3.new(1,1,1), 1, 0.5)
 
         local function UpdateState()
-            -- ดึงเลขลำดับจาก StateManager
             local orderNum = StateManager.selectedPets[uuid]
             local isSelected = (orderNum ~= nil)
 
@@ -1865,7 +1879,6 @@ function GUI:RenderPetDupeGrid()
             elseif isSelected then
                 Stroke.Color = THEME.CardStrokeSelected
                 Stroke.Enabled = true
-                -- แสดงเลขลำดับ
                 OrderBadge.Text = tostring(orderNum)
                 OrderBadge.Visible = true
             else
@@ -1884,14 +1897,10 @@ function GUI:RenderPetDupeGrid()
 
         ClickBtn.MouseButton1Click:Connect(function()
             if isLocked then return end
-            
-            -- 1. สลับการเลือก (Toggle)
             StateManager:TogglePetSelection(uuid)
-            
-            -- 2. อัพเดท Visual ของการ์ดใบนี้
             UpdateState()
             
-            -- 3. อัพเดทเลขลำดับของการ์ดใบอื่น (ตามโค้ดก่อนหน้านี้)
+            -- อัพเดทเลขของการ์ดอื่น
             for _, otherCard in pairs(self.InvContainer:GetChildren()) do
                 if otherCard:IsA("Frame") and otherCard:FindFirstChild("OrderBadge") then
                      local otherUUID = otherCard.Name
@@ -1912,7 +1921,7 @@ function GUI:RenderPetDupeGrid()
                 end
             end
             
-            -- [[ ✨ เพิ่มบรรทัดนี้: เรียกเช็คเงื่อนไขปุ่ม Evo ทุกครั้งที่กด ]] --
+            -- เช็คเงื่อนไขปุ่ม Evo
             self:UpdateEvoButtonState()
         end)
         
@@ -1977,15 +1986,13 @@ function GUI:RenderPetDupeGrid()
         NameLbl.TextYAlignment = Enum.TextYAlignment.Top
         NameLbl.Parent = Card
         
-        -- [[ 📌 UUID DISPLAY SECTION ]] --
+        -- UUID Display
         local shortID = uuid:sub(1, 5) .. ".." .. uuid:sub(#uuid - 4, #uuid)
-        
         local UUIDDisplay = Instance.new("TextLabel")
         UUIDDisplay.Text = shortID
         UUIDDisplay.Size = UDim2.new(1, -8, 0, 16)
         UUIDDisplay.Position = UDim2.new(0, 4, 1, -20)
         UUIDDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        
         UUIDDisplay.TextColor3 = Color3.fromRGB(255, 255, 255) 
         UUIDDisplay.Font = Enum.Font.Code 
         UUIDDisplay.TextSize = 10
