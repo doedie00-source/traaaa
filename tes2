@@ -1248,18 +1248,24 @@ function GUI:CreateCenterPanel()
      -- ปุ่ม EVOLVE (ตรงกลาง - ปุ่มใหม่ ✨)
     self.BtnEvoPet = UIFactory.CreateButton({
         Size = UDim2.new(0, 120, 0, 30),
-        Position = UDim2.new(0.5, -60, 0, 5), -- จัดกึ่งกลาง
+        Position = UDim2.new(0.5, -60, 0, 5),
         Text = "EVOLVE",
-        BgColor = Color3.fromRGB(40, 40, 40), -- เริ่มต้นเป็นสีเทา
+        BgColor = Color3.fromRGB(40, 40, 40),
         Parent = self.PetActionBar,
         OnClick = function()
-            -- เช็คสถานะความถูกต้องก่อนทำงาน
             if self.BtnEvoPet:GetAttribute("IsValid") then
+                -- เรียกฟังก์ชัน Evo
                 TradeManager.ExecuteEvolution(self.StatusLabel, function()
+                    -- [[ ✅ เพิ่ม delay เพื่อรอข้อมูล Server อัปเดต ]] --
+                    task.wait(0.6) 
+                    
+                    -- รีเฟรชหน้าจอ (รายการ Pet จะหายไป 3 ตัวที่ใช้ และได้ตัวใหม่มา)
                     self:RefreshInventory()
+                    
+                    -- รีเซ็ตสถานะปุ่มกลับเป็น "SELECT 3"
+                    self:UpdateEvoButtonState()
                 end)
             else
-                -- แจ้งเตือนถ้ากดตอนยังไม่พร้อม
                 local reason = self.BtnEvoPet:GetAttribute("Reason") or "Invalid Selection"
                 StateManager:SetStatus("⚠️ " .. reason, Color3.fromRGB(255, 200, 50), self.StatusLabel)
             end
