@@ -1581,49 +1581,61 @@ function GUI:UpdateUIState()
     end
     self.InvContainer.Size = UDim2.new(1, -10, 1, -35)
 
+    -- [[ 📏 กำหนดค่าคงที่ของ Sidebar ]] --
+    local SIDEBAR_WIDTH = 140 
+    
     if StateManager.currentMainTab == "Players" then
         self.SubMenuFrame.Visible = false
         self.TradeFrame.Visible = false
-        self.InvFrame.Size = UDim2.new(1, -150, 1, -80) 
+        
+        -- [[ ✅ FIX: คืนค่าตำแหน่งและขนาดให้เต็มจอ (แก้เพี้ยน) ]] --
+        self.InvFrame.Position = UDim2.new(0, SIDEBAR_WIDTH, 0, 50)
+        self.InvFrame.Size = UDim2.new(1, -SIDEBAR_WIDTH - 10, 1, -80)
+        
         self.InvHeader.Text = "Server Players (Force Trade)"
         
     elseif StateManager.currentMainTab == "Trade" then
         self.SubMenuFrame.Visible = true
         self.TradeFrame.Visible = true
         
-        local sidebarArea = 140
-        local frameWidth = 345 
-        self.InvFrame.Position = UDim2.new(0, sidebarArea + 10, 0, 50)
-        self.InvFrame.Size = UDim2.new(0, frameWidth, 1, -80) 
-        self.TradeFrame.Position = UDim2.new(0, sidebarArea + frameWidth + 20, 0, 50)
-        self.TradeFrame.Size = UDim2.new(0, frameWidth, 1, -80) 
+        -- [[ ✅ FIX: จัดหน้า Trade แบ่งซ้ายขวาให้สวยงาม ]] --
+        
+        -- กล่องซ้าย (Selection List) : เริ่มต้นต่อจาก Sidebar, กว้างครึ่งจอ - ส่วนเผื่อ
+        self.InvFrame.Position = UDim2.new(0, SIDEBAR_WIDTH, 0, 50)
+        self.InvFrame.Size = UDim2.new(0.5, -80, 1, -80) 
+        
+        -- กล่องขวา (Current Offer) : เริ่มต้นที่กลางจอ + ขยับนิดหน่อย
+        self.TradeFrame.Position = UDim2.new(0.5, 70, 0, 50)
+        self.TradeFrame.Size = UDim2.new(0.5, -80, 1, -80) 
         
         self.InvHeader.Text = "Selection List (" .. StateManager.currentSubTab .. ")"
         
     elseif StateManager.currentMainTab == "Dupe" then
         self.SubMenuFrame.Visible = true
         self.TradeFrame.Visible = false
-        self.InvFrame.Size = UDim2.new(1, -150, 1, -80)
+        
+        -- [[ ✅ FIX: คืนค่าตำแหน่งและขนาดให้เต็มจอ (แก้เพี้ยน) ]] --
+        self.InvFrame.Position = UDim2.new(0, SIDEBAR_WIDTH, 0, 50)
+        self.InvFrame.Size = UDim2.new(1, -SIDEBAR_WIDTH - 10, 1, -80)
+
         self.InvHeader.Text = "✨ Magic Dupe (" .. StateManager.currentDupeTab .. ")"
         
-        -- [[ ตรวจสอบว่าจะเปิด Action Bar ไหน ]] --
+        -- Action Bar Logic (เหมือนเดิม)
         if StateManager.currentDupeTab == "Pets" then
              self.PetActionBar.Visible = true
              self.InvContainer.Size = UDim2.new(1, -10, 1, -80) 
         elseif StateManager.currentDupeTab == "Crates" then
              self.CrateActionBar.Visible = true
-             self.InvContainer.Size = UDim2.new(1, -10, 1, -80) -- เว้นที่ให้ Crate Action Bar
+             self.InvContainer.Size = UDim2.new(1, -10, 1, -80)
         else
             self.DupeWarning.Visible = true
             self.InvContainer.Size = UDim2.new(1, -10, 1, -95)
-            
-            -- ปรับข้อความให้แสดงลิมิตรวมของทุกอย่าง
             local limitInfo = "SCROLLS: ~150 | TICKETS: 10k | POTIONS: 2k"
-            
             self.DupeWarning.Text = "⚠️ WARNING: Do not exceed limits.\n" .. limitInfo .. "\nRisk of ban if hoarding excessive amounts."
         end
     end
     
+    -- Update Tab Button Colors
     for name, btn in pairs(self.MainTabButtons) do
         local isSelected = (name == StateManager.currentMainTab)
         btn.BackgroundColor3 = isSelected and THEME.BtnMainTabSelected or THEME.BtnMainTab
